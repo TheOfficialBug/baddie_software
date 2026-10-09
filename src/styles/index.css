@@ -1,0 +1,335 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smashboard design tokens (from the Smashboard design canvas).
+   Layout: calm sports-desk UI. Warm off-white ground, ink hero bands, lime as the one
+   action color, pill controls and 44px touch targets. Dark theme is "graphite":
+   neutral charcoal surfaces (not pure black) with the same lime.
+   Colors are RGB channels so Tailwind can apply opacity (bg-fb/15). */
+:root {
+  --bg: 244 245 240;
+  --surface: 255 255 255;
+  --raised: 255 255 255;
+  --sunken: 236 238 230;
+  --border: 220 224 211;
+  --border-strong: 196 202 186;
+  --fg: 18 22 15;
+  --muted: 86 94 76;
+  --faint: 106 114 96;
+
+  --primary: 198 238 58;
+  --primary-hover: 184 226 38;
+  --primary-fg: 18 22 15;
+  --accent: 58 97 0;
+  --accent-soft: 236 246 205;
+  --accent-ink: 58 97 0;
+
+  --info: 31 79 224;
+  --info-soft: 230 236 253;
+  --live: 196 45 22;
+  --live-soft: 252 231 226;
+  --ok: 28 114 57;
+  --ok-soft: 226 243 231;
+  --warn: 138 81 0;
+  --warn-soft: 251 240 220;
+  --gold: 168 120 0;
+
+  --hero: 18 22 15;
+  --hero-fg: 244 245 240;
+  --hero-muted: 190 196 180;
+  --hero-line: 255 255 255;
+
+  --fa: 58 97 0;
+  --fb: 31 79 224;
+  --fc: 186 74 10;
+  --fd: 124 58 237;
+  --ev-ms: 31 79 224;
+  --ev-ws: 190 38 104;
+  --ev-md: 79 70 229;
+  --ev-wd: 138 81 0;
+  --ev-xd: 13 128 118;
+
+  --shadow: 18 22 15;
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23808791' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: 21 23 26;
+    --surface: 29 32 36;
+    --raised: 37 41 46;
+    --sunken: 16 18 20;
+    --border: 46 50 56;
+    --border-strong: 66 72 80;
+    --fg: 236 238 240;
+    --muted: 166 172 181;
+    --faint: 130 137 147;
+    --primary: 198 238 58;
+    --primary-hover: 214 246 104;
+    --primary-fg: 18 22 15;
+    --accent: 198 238 58;
+    --accent-soft: 42 50 26;
+    --accent-ink: 214 245 120;
+    --info: 138 165 255;
+    --info-soft: 30 38 66;
+    --live: 255 122 102;
+    --live-soft: 66 28 24;
+    --ok: 114 214 146;
+    --ok-soft: 22 52 34;
+    --warn: 242 184 96;
+    --warn-soft: 58 42 18;
+    --gold: 236 190 84;
+    --hero: 30 34 39;
+    --hero-fg: 236 238 240;
+    --hero-muted: 166 172 181;
+    --hero-line: 255 255 255;
+    --fa: 198 238 58;
+    --fb: 138 165 255;
+    --fc: 251 146 60;
+    --fd: 183 148 246;
+    --ev-ms: 138 165 255;
+    --ev-ws: 244 114 182;
+    --ev-md: 165 162 255;
+    --ev-wd: 242 184 96;
+    --ev-xd: 45 212 191;
+    --shadow: 0 0 0;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: 21 23 26;
+  --surface: 29 32 36;
+  --raised: 37 41 46;
+  --sunken: 16 18 20;
+  --border: 46 50 56;
+  --border-strong: 66 72 80;
+  --fg: 236 238 240;
+  --muted: 166 172 181;
+  --faint: 130 137 147;
+  --primary: 198 238 58;
+  --primary-hover: 214 246 104;
+  --primary-fg: 18 22 15;
+  --accent: 198 238 58;
+  --accent-soft: 42 50 26;
+  --accent-ink: 214 245 120;
+  --info: 138 165 255;
+  --info-soft: 30 38 66;
+  --live: 255 122 102;
+  --live-soft: 66 28 24;
+  --ok: 114 214 146;
+  --ok-soft: 22 52 34;
+  --warn: 242 184 96;
+  --warn-soft: 58 42 18;
+  --gold: 236 190 84;
+  --hero: 30 34 39;
+  --hero-fg: 236 238 240;
+  --hero-muted: 166 172 181;
+  --hero-line: 255 255 255;
+  --fa: 198 238 58;
+  --fb: 138 165 255;
+  --fc: 251 146 60;
+  --fd: 183 148 246;
+  --ev-ms: 138 165 255;
+  --ev-ws: 244 114 182;
+  --ev-md: 165 162 255;
+  --ev-wd: 242 184 96;
+  --ev-xd: 45 212 191;
+  --shadow: 0 0 0;
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: rgb(var(--bg));
+    color: rgb(var(--fg));
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  /* 16px inputs on phones stop iOS from zooming the page on focus */
+  @media (max-width: 639px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--info));
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(var(--primary) / 0.45);
+    color: rgb(var(--primary-fg));
+  }
+  dialog::backdrop {
+    background: rgb(var(--shadow) / 0.55);
+    backdrop-filter: blur(3px);
+  }
+  a,
+  button,
+  [role='button'],
+  summary,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: 'Bricolage Grotesque', 'IBM Plex Sans', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .num {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(var(--muted));
+  }
+  .panel {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    border-radius: 18px;
+  }
+  .panel-hover {
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .panel-hover:hover {
+    border-color: rgb(var(--border-strong));
+    box-shadow: 0 8px 24px -12px rgb(var(--shadow) / 0.25);
+  }
+  .hero {
+    background: rgb(var(--hero));
+    color: rgb(var(--hero-fg));
+  }
+  .field {
+    width: 100%;
+    min-height: 44px;
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--border-strong));
+    border-radius: 12px;
+    padding: 0.5rem 0.85rem;
+    font-size: 15px;
+    color: rgb(var(--fg));
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .field:hover {
+    border-color: rgb(var(--muted) / 0.6);
+  }
+  .field:focus {
+    outline: none;
+    border-color: rgb(var(--info));
+    box-shadow: 0 0 0 3px rgb(var(--info) / 0.2);
+  }
+  .field[aria-invalid='true'] {
+    border-color: rgb(var(--live) / 0.7);
+  }
+  .field[aria-invalid='true']:focus {
+    box-shadow: 0 0 0 3px rgb(var(--live) / 0.18);
+  }
+  .field::placeholder {
+    color: rgb(var(--faint));
+  }
+  .field:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border-strong)) transparent;
+  }
+  /* Content that clears a fixed phone bottom bar */
+  /* Extends the tappable area of a small control to at least 44×44 without changing its look. */
+  .tap-target {
+    position: relative;
+  }
+  .tap-target::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .pb-safe-bar {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  }
+  @media (min-width: 768px) {
+    /* Extends the tappable area of a small control to at least 44×44 without changing its look. */
+    .tap-target {
+      position: relative;
+    }
+    .tap-target::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+    .pb-safe-bar {
+      padding-bottom: 56px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  /* :not(#x) raises specificity above the dark-theme blocks: print is always light. */
+  :root:not(#x) {
+    --bg: 255 255 255;
+    --surface: 255 255 255;
+    --fg: 0 0 0;
+    --muted: 70 70 70;
+    --border: 180 180 180;
+    color-scheme: light;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
