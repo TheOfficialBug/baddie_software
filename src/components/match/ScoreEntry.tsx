@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { checkGame, checkMatch, parseQuickScore } from '@/engine/rules';
 import type { GameScore, ResultType, Side } from '@/engine/types';
 
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 
 import { useLookup } from '@/data/lookup';
@@ -16,6 +17,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import { HelpTip } from '@/components/ui/HelpTip';
 import { Icon } from '@/components/ui/Icon';
 import { Segmented } from '@/components/ui/Tabs';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 const RESULT_OPTIONS: { value: ResultType; label: string }[] = [
   { value: 'normal', label: 'Played' },
@@ -41,6 +43,8 @@ export function ScoreForm({
   const saveResult = useStore((s) => s.saveResult);
   const setLiveScore = useStore((s) => s.setLiveScore);
   const undo = useStore((s) => s.undo);
+  const resetMatch = useStore((s) => s.resetMatch);
+  const { ask, dialog } = useConfirm();
   const rules = m ? lk.matchRules(m) : null;
   const n = rules?.bestOf ?? 3;
 
@@ -48,13 +52,23 @@ export function ScoreForm({
     const games: GameScore[] = m ? [...m.games, ...(m.live && (m.live[0] || m.live[1]) ? [m.live] : [])] : [];
     return Array.from({ length: n }, (_, i) => (games[i] ? [String(games[i][0]), String(games[i][1])] : ['', '']));
   };
-  const [cells, setCells] = useState<string[][]>(initial);
+  // The slip being typed is saved per match on this device, so switching to another event,
+  // page or tab and coming back keeps it. It's cleared once the score is saved.
+  const [slip, setSlip, clearSlip, restored] = usePersistentState<{ cells: string[][]; result: ResultType; special?: Side }>(
+    `score:${matchId}`,
+    () => ({
+      cells: initial(),
+      result: m?.result ?? 'normal',
+      special:
+        !m?.result || m.result === 'normal' || !m.winner ? undefined : m.result === 'walkover' ? m.winner : m.winner === 'a' ? 'b' : 'a',
+    }),
+  );
+  const { cells, result, special } = slip;
+  const setCells = (v: string[][] | ((c: string[][]) => string[][])) =>
+    setSlip((x) => ({ ...x, cells: typeof v === 'function' ? v(x.cells) : v }));
+  const setResult = (v: ResultType) => setSlip((x) => ({ ...x, result: v }));
+  const setSpecial = (v: Side | undefined) => setSlip((x) => ({ ...x, special: v }));
   const [quick, setQuick] = useState('');
-  const [result, setResult] = useState<ResultType>(m?.result ?? 'normal');
-  const [special, setSpecial] = useState<Side | undefined>(() => {
-    if (!m?.result || m.result === 'normal' || !m.winner) return undefined;
-    return m.result === 'walkover' ? m.winner : m.winner === 'a' ? 'b' : 'a';
-  });
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
   const first = useRef<HTMLInputElement>(null);
@@ -97,6 +111,7 @@ export function ScoreForm({
       setError(err);
       return;
     }
+    clearSlip();
     const after = useStore.getState();
     const lastUpdate = after.updates[after.updates.length - 1];
     const w = check.winner!;
@@ -122,6 +137,8 @@ export function ScoreForm({
   };
 
   const messages: { tone: 'ok' | 'live' | 'info'; tag: string; text: string }[] = [];
+  if (restored && !touched && !winner)
+    messages.push({ tone: 'info', tag: 'Kept', text: 'Scores you typed earlier for this match were kept.' });
   if (error) messages.push({ tone: 'live', tag: 'Problem', text: error });
   else if (winner) {
     messages.push({
@@ -290,6 +307,35 @@ export function ScoreForm({
       )}
 
       <div className="flex flex-col-reverse gap-2.5 border-t border-line pt-4 xs:flex-row xs:flex-wrap xs:items-center xs:justify-end">
+        {m.status === 'finished' && (
+          <Button
+            variant="ghost"
+            className="text-live xs:mr-auto"
+            icon={<Icon name="refresh" size={17} />}
+            onClick={() =>
+              ask({
+                title: `Reset the result of match #${m.number}?`,
+                body: 'The score is cleared and the match goes back to not played, ready to call again.',
+                warning: 'The winner is taken out of their next match.',
+                confirmLabel: 'Reset result',
+                danger: true,
+                onConfirm: () => {
+                  const err = resetMatch(m.id);
+                  if (err) {
+                    toast(err, { tone: 'error' });
+                    return;
+                  }
+                  clearSlip();
+                  toast(`Match #${m.number} reset`, { tone: 'info', detail: 'It is back in the queue.' });
+                  onDone();
+                },
+              })
+            }
+          >
+            Reset result
+          </Button>
+        )}
+        {dialog}
         {onCancel && (
           <Button variant="ghost" onClick={onCancel}>
             Cancel
@@ -299,6 +345,7 @@ export function ScoreForm({
           <Button
             onClick={() => {
               setLiveScore(m.id, liveSplit.games, liveSplit.live);
+              clearSlip();
               toast(`Live score updated on ${lk.courtName(ctx.ev.tournamentId, m.courtId)}`, {
                 tone: 'info',
                 detail: 'Spectators see it right away.',

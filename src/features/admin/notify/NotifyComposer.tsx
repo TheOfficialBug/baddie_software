@@ -33,7 +33,7 @@ interface ComposerProps {
 /** "New notification" form: template, headline, message, audience and channels. */
 export function NotifyComposer(p: ComposerProps) {
   return (
-    <section className="panel flex min-w-0 flex-col gap-5 p-5 sm:p-7" aria-label="New notification">
+    <section className="panel flex min-w-0 flex-col gap-5 p-4 sm:p-5" aria-label="New notification">
       <h2 className="font-display text-[22px] font-bold">New notification</h2>
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-semibold">Start from</span>

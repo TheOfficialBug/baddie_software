@@ -71,15 +71,15 @@ export function Dialog({
             'flex flex-col border-line bg-surface shadow-pop',
             drawer
               ? 'h-full animate-slide-in border-l'
-              : 'max-h-[92dvh] animate-sheet-up rounded-t-3xl border-t sm:max-h-[calc(100dvh-48px)] sm:animate-rise sm:rounded-3xl sm:border',
+              : 'max-h-[92dvh] animate-sheet-up rounded-t-3xl border-t sm:max-h-[calc(100dvh-48px)] sm:animate-rise sm:rounded-2xl sm:border',
           )}
           style={drawer ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}
         >
           {!drawer && <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" aria-hidden />}
           <header className="flex items-start gap-3 px-5 pb-3 pt-4 sm:px-6 sm:pt-5">
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-[22px] font-extrabold leading-tight">{title}</h2>
-              {subtitle && <div className="mt-1 text-[14px] text-muted">{subtitle}</div>}
+              <h2 className="font-display text-[19px] font-extrabold leading-tight">{title}</h2>
+              {subtitle && <div className="mt-0.5 text-[13.5px] text-muted">{subtitle}</div>}
             </div>
             <IconButton label="Close" onClick={onClose} className="-mr-2 -mt-1">
               <Icon name="close" size={20} />
@@ -88,8 +88,8 @@ export function Dialog({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6">{children}</div>
           {footer && (
             <footer
-              className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line px-5 py-4 sm:px-6"
-              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+              className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line px-5 py-3 sm:px-6"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
             >
               {footer}
             </footer>

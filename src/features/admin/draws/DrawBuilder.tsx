@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router';
 import { cn } from '@/lib/cn';
 
 import { useLookup } from '@/data/lookup';
+import { useStore } from '@/data/store';
 
 import { NotFound } from '@/components/NotFound';
 import { EventChip } from '@/components/tournament/Badges';
-import { ButtonLink } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Empty } from '@/components/ui/Empty';
 import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -18,6 +19,7 @@ export function DrawBuilder() {
   const { tid, eventId } = useParams();
   const lk = useLookup();
   const nav = useNavigate();
+  const setStage = useStore((st) => st.setStage);
   const t = lk.tournament(tid);
   if (!t) return <NotFound what="tournament" />;
   const events = lk.eventsOf(t.id);
@@ -32,12 +34,25 @@ export function DrawBuilder() {
         description={
           events.length ? (
             <>
-              Pick a format, check the seeds, preview the draw and publish it. <span className="num">{drawn}</span> of{' '}
-              <span className="num">{events.length}</span> events are drawn.
+              <span className="num">{drawn}</span> of <span className="num">{events.length}</span> events drawn.
             </>
           ) : undefined
         }
       />
+      {(t.status === 'registration' || t.status === 'draft') && events.length > 0 && (
+        <div
+          className="flex flex-col gap-3 rounded-2xl bg-warn-soft p-4 text-warn sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <p className="flex items-start gap-2 text-[14px] font-medium">
+            <Icon name="alert" size={18} className="mt-0.5 shrink-0" />
+            Registration is still open, so entries can change. Close it before drawing, or draw now and redo it if entries change.
+          </p>
+          <Button variant="primary" className="shrink-0" icon={<Icon name="lock" size={18} />} onClick={() => setStage(t.id, 'closed')}>
+            Close registration
+          </Button>
+        </div>
+      )}
       {events.length === 0 ? (
         <Empty
           icon="draws"

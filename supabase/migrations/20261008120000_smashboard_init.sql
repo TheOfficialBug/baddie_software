@@ -18,7 +18,7 @@
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
-create type public.tournament_status as enum ('draft', 'registration', 'live', 'completed', 'archived');
+create type public.tournament_status as enum ('draft', 'registration', 'closed', 'live', 'completed', 'archived');
 create type public.event_kind as enum ('MS', 'WS', 'MD', 'WD', 'XD');
 create type public.draw_mode as enum ('round_robin', 'drop_flight', 'knockout');
 create type public.drop_variant as enum ('AB', 'ABCD');

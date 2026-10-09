@@ -2,7 +2,7 @@
 import { assignNumbers, blockingDependents, resolveMatches } from '@/engine/progression';
 import { checkGame, checkMatch, groupRulesId, RULES, rulesIdForMatch, type ScoringRules } from '@/engine/rules';
 import { checkCall } from '@/engine/scheduler';
-import type { DrawPlan, GameScore, ID, Match, MatchUpdate, ResultType, Side, TEvent, Tournament } from '@/engine/types';
+import type { DrawPlan, GameScore, ID, Match, MatchUpdate, ResultType, Side, SkillLevel, TEvent, Tournament } from '@/engine/types';
 
 import type { DB, Notice } from '@/data/types';
 
@@ -62,6 +62,25 @@ export function publishPlan(db: DB, eventId: ID, plan: DrawPlan, rngSeed: number
     stages: [...db.stages.filter((s) => s.eventId !== eventId), ...plan.stages],
     groups: [...db.groups.filter((g) => g.eventId !== eventId), ...plan.groups],
     matches: [...db.matches.filter((m) => m.eventId !== eventId), ...matches],
+    drawDrafts: db.drawDrafts.filter((d) => d.eventId !== eventId),
+  };
+}
+
+/**
+ * Correct a level given for an event (a mistake at registration). `slot` is the player's place in
+ * the entry; the slot after the last player is the partner named at registration but not signed up.
+ * Only this entry changes: the player's level in their other events stays as entered.
+ */
+export function setEntryLevel(db: DB, entryId: ID, slot: number, level: SkillLevel): DB {
+  return {
+    ...db,
+    entries: db.entries.map((e) => {
+      if (e.id !== entryId) return e;
+      if (slot === e.playerIds.length) return e.pendingPartner ? { ...e, pendingPartner: { ...e.pendingPartner, level } } : e;
+      if (slot < 0 || slot > e.playerIds.length) return e;
+      const levels = e.levels ?? e.playerIds.map((p) => db.players.find((x) => x.id === p)?.level ?? 'C');
+      return { ...e, levels: levels.map((l, i) => (i === slot ? level : l)) };
+    }),
   };
 }
 
@@ -88,6 +107,15 @@ export function drawPublishedNotice(ev: TEvent, now: number): Notice {
     channels: ['app', 'email'],
     title: `${ev.name} draw is out`,
     body: 'See who you play and when on the Draws page.',
+  };
+}
+
+/** Notice to an event's players that the organizer changed who starts where. */
+export function drawUpdatedNotice(ev: TEvent, now: number): Notice {
+  return {
+    ...drawPublishedNotice(ev, now),
+    title: `${ev.name} draw updated`,
+    body: 'Some starting places changed. Check who you play next on the Draws page.',
   };
 }
 
@@ -120,6 +148,8 @@ export function clearDraw(db: DB, eventId: ID): DB {
     stages: db.stages.filter((s) => s.eventId !== eventId),
     groups: db.groups.filter((g) => g.eventId !== eventId),
     matches: db.matches.filter((m) => m.eventId !== eventId),
+    // saved, unpublished edits of a removed draw no longer apply
+    drawDrafts: db.drawDrafts.filter((d) => d.eventId !== eventId),
   };
 }
 
@@ -206,6 +236,23 @@ export function adjustLive(db: DB, matchId: ID, side: Side, delta: 1 | -1, rules
     live = [0, 0];
   }
   return { db: patchMatch(db, matchId, { games, live, startedAt: m.startedAt ?? now }) };
+}
+
+/**
+ * Live update typed in directly: set one side's points in the current game. A finished game
+ * (e.g. 21-17) rolls into `games` and the next game starts at 0-0, the same as with +1.
+ */
+export function setLivePoints(db: DB, matchId: ID, side: Side, points: number, rules: ScoringRules, now = Date.now()): OpResult {
+  const m = db.matches.find((x) => x.id === matchId);
+  if (!m || m.status !== 'on_court') return { error: 'Only matches on court can be updated live.' };
+  if (!Number.isInteger(points) || points < 0 || points > rules.cap) return { error: `Enter a score from 0 to ${rules.cap}.` };
+  if (matchDecided(m.games, rules)) return { error: 'The match is decided. Confirm the result.' };
+  const live: GameScore = m.live ? [...m.live] : [0, 0];
+  live[side === 'a' ? 0 : 1] = points;
+  const c = checkGame(live, rules);
+  if (!c.valid) return { error: c.message ?? `${live[0]}-${live[1]} is not a possible score.` };
+  const games = c.complete ? [...m.games, live] : m.games;
+  return { db: patchMatch(db, matchId, { games, live: c.complete ? [0, 0] : live, startedAt: m.startedAt ?? now }) };
 }
 
 export function matchDecided(games: GameScore[], rules: ScoringRules): boolean {

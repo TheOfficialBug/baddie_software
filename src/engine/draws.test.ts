@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { spreadClubs } from './clubSpread';
 import { bwfSeedCount, type DrawInput, generateDraw, groupCount, nextPow2, placeKnockout, roundRobinPairs, seedLines } from './draws';
 import { arrangeBalanced, LEVEL_VALUE, rankByLevel, separateGroups } from './pairing';
 import { hashString, mulberry32, shuffle } from './rng';
@@ -230,7 +231,7 @@ describe('placeKnockout club separation', () => {
   it('turns clashes into draw warnings using entry names', () => {
     const plan = draw('knockout', 4, { thirdPlace: false }, { clubOf: () => 'Alpha', nameOf: (id) => `Player ${id}` });
     expect(plan.warnings).toHaveLength(2);
-    expect(plan.warnings[0]).toMatch(/^Player e\d and Player e\d are from the same club/);
+    expect(plan.warnings[0]).toMatch(/^Player e\d and Player e\d are both from Alpha and meet in round 1/);
   });
 });
 
@@ -537,11 +538,17 @@ describe('generateDraw · level-aware pairing', () => {
       ['knockout', 'ev-main', 'classic'],
       ['drop_flight', 'ev-A', 'balanced'],
       ['drop_flight', 'ev-A', 'classic'],
-    ] as const)('%s %s with %s pairing places entries with arrangeBalanced', (mode, stageId, pairing) => {
+    ] as const)('%s %s with %s pairing places entries with arrangeBalanced, then spreads clubmates', (mode, stageId, pairing) => {
       const plan = draw(mode, n, { pairing }, { seeds, levelOf, clubOf, rngSeed: RNG });
-      const expected = arrangeBalanced({ entryIds: entryIds(n), seeds, levelOf, clubOf, pairing, rand: mulberry32(RNG) });
-      expect(lineEntries(plan, stageId)).toEqual(expected.lines);
-      expect(plan.warnings.filter((w) => w.includes('same club'))).toHaveLength(expected.clubClashes.length);
+      const ids = entryIds(n);
+      const arranged = arrangeBalanced({ entryIds: ids, seeds, levelOf, clubOf, pairing, rand: mulberry32(RNG) });
+      const expected = spreadClubs({
+        lines: arranged.lines,
+        seeded: new Set(ids.slice(0, seeds)),
+        clubOf,
+        sameStrength: (a, b) => levelOf(a) === levelOf(b),
+      });
+      expect(lineEntries(plan, stageId)).toEqual(expected);
     });
 
     it.each(['knockout', 'drop_flight', 'round_robin'] as const)(
@@ -554,13 +561,13 @@ describe('generateDraw · level-aware pairing', () => {
       },
     );
 
-    it.each(['knockout', 'drop_flight'] as const)('%s without levelOf uses the BWF draw by lot exactly as before', (mode) => {
+    it.each(['knockout', 'drop_flight'] as const)('%s without levelOf uses the BWF draw by lot, then spreads clubmates', (mode) => {
       const stageId = mode === 'knockout' ? 'ev-main' : 'ev-A';
       for (const pairing of ['balanced', 'classic', 'random'] as const) {
         const plan = draw(mode, n, { pairing }, { seeds, clubOf, rngSeed: RNG });
         const ids = entryIds(n);
-        const expected = placeKnockout(ids.slice(0, seeds), ids.slice(seeds), mulberry32(RNG), clubOf);
-        expect(lineEntries(plan, stageId)).toEqual(expected.lines);
+        const lot = placeKnockout(ids.slice(0, seeds), ids.slice(seeds), mulberry32(RNG), clubOf);
+        expect(lineEntries(plan, stageId)).toEqual(spreadClubs({ lines: lot.lines, seeded: new Set(ids.slice(0, seeds)), clubOf }));
       }
     });
 

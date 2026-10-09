@@ -8,6 +8,10 @@ players and spectators follow courts, brackets and their next match on any devic
 > scorers, admins and owners. Without Supabase settings it runs in demo mode on data stored in the browser, with
 > ready-made demo accounts. The Supabase database is designed and tested ([supabase/SCHEMA.md](supabase/SCHEMA.md));
 > connecting it is described in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+>
+> The app starts with **Iowa Open Test 26** (modelled on the real Iowa Open 2026: five Open events, 120 entries,
+> invented player names) with registration open. Sign in as the demo organizer and open **Simulator** in the organizer
+> desk to close registration, make the draws and play the whole tournament while the public pages update live.
 
 ## Quick start
 
@@ -49,13 +53,15 @@ src/
     match/ draw/ tournament/ notices/ help/   domain components shared by several screens
   features/
     public/     home, tournament pages (overview, courts, draws, schedule, players), registration, my matches, TV
-    admin/      organizer desk: dashboard, courts, live scoring, entries, draws, slips, notifications, settings
+    admin/      organizer desk: run-tournament home (stages + court board), entries, draws, results, slips, messages, settings
   hooks/ lib/   small shared hooks and utilities
   styles/       Tailwind entry and design tokens (light + graphite dark)
   test/         test setup
 supabase/       database migration, schema design notes, database tests
-docs/           architecture, deployment, product plan
+docs/           architecture, competition rules, deployment, product plan
 ```
+
+The competition rules (scoring, draws, seeding, club separation, standings) are in [docs/RULES.md](docs/RULES.md).
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before adding features, and [CONTRIBUTING.md](CONTRIBUTING.md) for conventions.
 

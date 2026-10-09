@@ -35,7 +35,7 @@ function LevelTag({ level, who }: { level: NonNullable<EventDetails['myLevel']>;
 export function ReviewStep({ t, me, chosen, picked, total, onEditStep }: Props) {
   return (
     <section aria-labelledby="step-review">
-      <h2 id="step-review" className="mb-1 font-display text-[clamp(20px,2.4vw,24px)] font-extrabold">
+      <h2 id="step-review" className="mb-1 font-display text-[18px] font-extrabold sm:text-[20px]">
         Check and pay
       </h2>
       <p className="mb-4 text-[14px] text-muted">Make sure everything looks right. Tap Edit to change a section.</p>

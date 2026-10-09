@@ -4,7 +4,6 @@ import type { Gender, Tournament } from '@/engine/types';
 
 import { cn } from '@/lib/cn';
 
-import { CLUBS } from '@/data/demo';
 import { useStore } from '@/data/store';
 
 import { Combobox, type ComboOption } from '@/components/ui/Combobox';
@@ -36,7 +35,6 @@ export function AboutYouStep({ t, me, setMe, errors, emailLocked }: Props) {
   const players = useStore((s) => s.players);
   const clubOptions = useMemo<ComboOption[]>(() => {
     const counts = new Map<string, number>();
-    for (const c of CLUBS) counts.set(c, 0);
     for (const p of players) if (p.club && p.club !== NO_CLUB) counts.set(p.club, (counts.get(p.club) ?? 0) + 1);
     return [
       ...[...counts].map(([c, n]) => ({ value: c, hint: n ? `${n} player${n === 1 ? '' : 's'}` : undefined, icon: 'users' as const })),
@@ -48,11 +46,11 @@ export function AboutYouStep({ t, me, setMe, errors, emailLocked }: Props) {
 
   return (
     <section aria-labelledby="step-about">
-      <h2 id="step-about" className="mb-1 font-display text-[clamp(20px,2.4vw,24px)] font-extrabold">
+      <h2 id="step-about" className="mb-1 font-display text-[18px] font-extrabold sm:text-[20px]">
         About you
       </h2>
       <p className="mb-4 text-[14px] text-muted">We use this to check which events you can enter and to keep clubmates apart early on.</p>
-      <div className="panel grid gap-5 p-4 sm:grid-cols-2 sm:p-6">
+      <div className="panel grid gap-5 p-4 sm:grid-cols-2 sm:p-5">
         <Field label="Full name" required error={errors.name}>
           {(id) => (
             <Input

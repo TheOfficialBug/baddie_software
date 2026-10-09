@@ -8,10 +8,10 @@ import type { Lookup } from '@/data/lookup';
 
 import { Bracket } from '@/components/draw/Bracket';
 import { GroupCard } from '@/components/draw/Groups';
-import { FlightBadge, Pill } from '@/components/tournament/Badges';
+import { FlightBadge } from '@/components/tournament/Badges';
 import { Empty } from '@/components/ui/Empty';
+import { HelpTip } from '@/components/ui/HelpTip';
 import { Icon } from '@/components/ui/Icon';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 
 const FROM: Record<string, Record<FlightLabel, string>> = {
   ABCD: { A: 'Everyone starts here', B: 'Lost in A round 2', C: 'Lost in A round 1', D: 'Lost in C round 1' },
@@ -53,7 +53,7 @@ export function EventDraw({
     const ko = stages.find((s) => s.kind === 'knockout');
     const groups = lk.groupsOf(gs.id);
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-6">
         <div className={cn('grid gap-5', groups.length > 1 && 'xl:grid-cols-2')}>
           {groups.map((g) => (
             <GroupCard
@@ -78,7 +78,7 @@ export function EventDraw({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {stages.map((s) => (
         <Bracket
           key={s.id}
@@ -120,66 +120,51 @@ function DropFlight({
   const stage = stages.find((s) => s.flight === sel) ?? stages[0];
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-3 rounded-2xl bg-sunken p-4 text-[14px] text-muted">
-        <Icon name="info" size={20} className="mt-0.5 text-fg" />
-        <p>
-          <span className="font-semibold text-fg">How drop flights work: </span>
-          {variant === 'ABCD'
-            ? 'everyone starts in Flight A. Lose in A round 1 → Flight C. Lose in A round 2 → Flight B. Lose in C round 1 → Flight D. Every flight crowns its own champion.'
-            : 'everyone starts in Flight A. Lose in A round 1 and you drop to Flight B, so everyone plays at least twice.'}
-        </p>
-      </div>
-      <div
-        role="tablist"
-        aria-label="Flights"
-        className={cn('grid gap-2.5', variant === 'ABCD' ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2')}
-      >
-        {stages.map((s) => {
-          const ms = (byStage.get(s.id) ?? []).filter((m) => m.status !== 'bye');
-          const done = ms.filter((m) => m.status === 'finished').length;
-          const live = ms.filter((m) => m.status === 'on_court').length;
-          const final = (byStage.get(s.id) ?? []).find((m) => m.round === s.rounds);
-          const champ = final?.status === 'finished' && final.winner ? final[final.winner] : null;
-          const on = s.flight === sel;
-          return (
-            <button
-              key={s.id}
-              role="tab"
-              aria-selected={on}
-              onClick={() => setSel(s.flight!)}
-              className={cn(
-                'flex min-h-[88px] min-w-0 flex-col gap-2 rounded-2xl border-[1.5px] bg-surface p-3.5 text-left transition-colors sm:p-4',
-                on ? 'border-fg' : 'border-line hover:border-fg/40',
-              )}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2">
-                  <FlightBadge flight={s.flight!} size="sm" />
-                  <strong className="font-display text-[18px] sm:text-[20px]">Flight {s.flight}</strong>
-                </span>
-                {champ ? (
-                  <Pill tone="ok">Done</Pill>
-                ) : live > 0 ? (
-                  <Pill tone="live">{live} live</Pill>
-                ) : (
-                  <Pill tone="muted">
-                    {done}/{ms.length}
-                  </Pill>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="tablist" aria-label="Flights" className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {stages.map((s) => {
+            const ms = (byStage.get(s.id) ?? []).filter((m) => m.status !== 'bye');
+            const done = ms.filter((m) => m.status === 'finished').length;
+            const live = ms.filter((m) => m.status === 'on_court').length;
+            const final = (byStage.get(s.id) ?? []).find((m) => m.round === s.rounds);
+            const champ = final?.status === 'finished' && final.winner ? final[final.winner] : null;
+            const on = s.flight === sel;
+            return (
+              <button
+                key={s.id}
+                role="tab"
+                aria-selected={on}
+                onClick={() => setSel(s.flight!)}
+                title={FROM[variant][s.flight!]}
+                className={cn(
+                  'flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors touch:min-h-11',
+                  on ? 'border-fg bg-fg text-bg' : 'border-line bg-surface hover:border-fg/50',
                 )}
-              </span>
-              <span className="text-[12.5px] text-muted">{FROM[variant][s.flight!]}</span>
-              {champ ? (
-                <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold">
-                  <Icon name="trophy" size={15} />
-                  <span className="truncate">{lk.entryName(champ)}</span>
-                </span>
-              ) : (
-                <ProgressBar value={done} max={ms.length} className="h-1.5" tone="ink" />
-              )}
-            </button>
-          );
-        })}
+              >
+                <FlightBadge flight={s.flight!} size="sm" />
+                Flight {s.flight}
+                {champ ? (
+                  <Icon name="trophy" size={14} />
+                ) : live > 0 ? (
+                  <span className="num text-[11.5px] text-live">{live} live</span>
+                ) : (
+                  <span className={cn('num text-[11.5px]', on ? 'opacity-70' : 'text-muted')}>
+                    {done}/{ms.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <span className="flex items-center gap-1 text-[12.5px] text-muted">
+          {FROM[variant][sel]}
+          <HelpTip label="How drop flights work">
+            {variant === 'ABCD'
+              ? 'Everyone starts in Flight A. Lose in A round 1 → Flight C. Lose in A round 2 → Flight B. Lose in C round 1 → Flight D. Every flight crowns its own champion.'
+              : 'Everyone starts in Flight A. Lose in A round 1 and you drop to Flight B, so everyone plays at least twice.'}
+          </HelpTip>
+        </span>
       </div>
       <Bracket key={stage.id} lk={lk} stage={stage} matches={byStage.get(stage.id) ?? []} highlight={highlight} onOpen={onOpen} />
     </div>

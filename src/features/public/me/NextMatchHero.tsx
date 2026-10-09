@@ -47,7 +47,7 @@ export function NextMatchHero({ lk, t, playerId }: { lk: Lookup; t: Tournament; 
   if (onCourt) {
     const court = lk.courtName(t.id, next.courtId);
     return (
-      <section className="hero relative overflow-hidden rounded-[18px] p-5 sm:p-7" aria-label="Your match is on court">
+      <section className="hero relative overflow-hidden rounded-[18px] p-4 sm:p-5" aria-label="Your match is on court">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
             <Pill tone="lime">
@@ -86,7 +86,7 @@ export function NextMatchHero({ lk, t, playerId }: { lk: Lookup; t: Tournament; 
   }
 
   return (
-    <section className="panel flex flex-col gap-5 p-5 sm:p-6 md:flex-row md:items-center" aria-label="Your next match">
+    <section className="panel flex flex-col gap-5 p-4 sm:p-5 md:flex-row md:items-center" aria-label="Your next match">
       <div className="flex shrink-0 items-center gap-4 md:flex-col md:items-start md:gap-1 md:border-r md:border-line md:pr-6">
         <span className="eyebrow">Your place in line</span>
         <span className="num text-[clamp(36px,6vw,52px)] font-semibold leading-none">{qIndex === 0 ? 'Next' : `${qIndex + 1}`}</span>

@@ -33,6 +33,7 @@ In VS Code, install the recommended extensions (`.vscode/extensions.json`): file
 - Every screen must work from 320px phones to 1920px TVs. Breakpoints (`tailwind.config.js`): `2xs` 350 · `xs` 380 · `sm` 640 · `md` 768 · `lg` 1024 · `xl` 1280 · `2xl` 1536 · `3xl` 1920, plus `short` (landscape phones) and `touch` (touch screens).
 - Tap targets are at least 44px on touch screens: use `touch:min-h-11` on compact controls, or the `tap-target` class to enlarge the hit area of a small icon button without changing its look.
 - Responsive grids need a shrinkable base column (`grid-cols-1`, or `minmax(0,…)` tracks), otherwise a wide child (like a sideways-scrolling chip row) stretches the page on phones.
+- Unsaved work (draw setups, score slips, messages, forms) uses `usePersistentState` with a key that names what it belongs to (`draw:${eventId}`, `score:${matchId}`), so switching events, pages or tabs never loses it; call its `clear()` once the work is saved. Screen choices such as the event filter use it too.
 - Required fields: mark them with `<Field required>` and validate before moving on; show errors only after the user tries to continue.
 - Interactive elements need accessible names, keyboard support and 44px touch targets. ESLint's `jsx-a11y` rules catch the common mistakes.
 

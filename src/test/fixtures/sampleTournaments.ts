@@ -1,15 +1,18 @@
-// Demo data: three fictional tournaments (live today, registration open, completed),
-// built with the real draw engine and progressed with simulated results.
+// Test fixture: three fictional tournaments (live today, registration open, completed), built with the
+// real draw engine and progressed with simulated results. Tests use it for a realistic mid-tournament state;
+// the app itself starts from data/seed/iowaOpen.ts.
 import { DEMO_ACCOUNTS, DEMO_ORG } from '@/config/demo';
 import { bwfSeedCount, generateDraw } from '@/engine/draws';
 import { LEVEL_VALUE } from '@/engine/pairing';
 import { mulberry32, shuffle } from '@/engine/rng';
-import { defaultRulesForDate, gamesToWin, type ScoringRules } from '@/engine/rules';
-import type { Entry, EventConfig, EventKind, GameScore, ID, Mode, Player, Side, TEvent, Tournament } from '@/engine/types';
+import { defaultRulesForDate } from '@/engine/rules';
+import type { Entry, EventConfig, EventKind, GameScore, ID, Mode, Player, TEvent, Tournament } from '@/engine/types';
 
 import { addDaysISO, todayISO } from '@/lib/format';
 
+import { KIND_LABEL } from '@/data/catalog';
 import { callToCourt, publishPlan, resolveTournament, rulesOfMatch } from '@/data/ops';
+import { simulateResult } from '@/data/simulate';
 import { type DB, emptyDB } from '@/data/types';
 
 const MEN = [
@@ -141,15 +144,7 @@ export const CLUBS = [
 
 const baseConfig: EventConfig = { groupSize: 4, advance: 2, variant: 'ABCD', thirdPlace: false, plate: false, seeds: 0 };
 
-export const KIND_LABEL: Record<EventKind, string> = {
-  MS: "Men's Singles",
-  WS: "Women's Singles",
-  MD: "Men's Doubles",
-  WD: "Women's Doubles",
-  XD: 'Mixed Doubles',
-};
-
-export function buildDemo(now = Date.now()): DB {
+export function buildSampleData(now = Date.now()): DB {
   const rand = mulberry32(20261008);
   let db = emptyDB();
   const today = todayISO();
@@ -423,34 +418,6 @@ export function buildDemo(now = Date.now()): DB {
     players: db.players.map((p) => (linked.has(p.id) ? { ...p, userId: linked.get(p.id)!.id, email: linked.get(p.id)!.email } : p)),
   };
   return db;
-}
-
-/** Plausible game scores; the stronger side wins more often. */
-export function simulateResult(r: ScoringRules, sa: number, sb: number, rand: () => number): { games: GameScore[]; winner: Side } {
-  const pA = 1 / (1 + 10 ** ((sb - sa) / 4));
-  const need = gamesToWin(r);
-  const games: GameScore[] = [];
-  let wa = 0;
-  let wb = 0;
-  while (wa < need && wb < need) {
-    const aWins = rand() < pA + (rand() - 0.5) * 0.2;
-    const P = r.pointsToWin;
-    let w = P;
-    let l: number;
-    if (r.cap > P && rand() < 0.14) {
-      const extra = Math.floor(rand() * Math.min(5, r.cap - P));
-      w = P + 1 + extra;
-      l = w - 2;
-      if (w > r.cap) w = r.cap;
-      if (w === r.cap) l = r.cap - 1 - Math.floor(rand() * 2);
-    } else {
-      l = Math.max(0, Math.round(P - 2 - rand() * rand() * (P - 4)));
-    }
-    games.push(aWins ? [w, l] : [l, w]);
-    if (aWins) wa++;
-    else wb++;
-  }
-  return { games, winner: wa > wb ? 'a' : 'b' };
 }
 
 /** Finish matches event by event up to a fraction of each event (number or per-event map), then fill courts. */

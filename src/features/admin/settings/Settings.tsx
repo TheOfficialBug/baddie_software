@@ -1,8 +1,9 @@
-import { useState } from 'react';
 import { useParams } from 'react-router';
 
 import { RULES } from '@/engine/rules';
 import type { RulesId, Tournament } from '@/engine/types';
+
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 import { useLookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
@@ -18,7 +19,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { SectionHead } from '@/components/ui/Section';
 import { Select } from '@/components/ui/Select';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { useConfirm } from '@/components/ui/useConfirm';
 
+import { ResetSection } from '@/features/admin/settings/ResetSection';
 import { TeamSection } from '@/features/admin/settings/TeamSection';
 
 const restHelp = GLOSSARY.find((g) => g.term === 'Rest time')?.body;
@@ -46,18 +49,30 @@ export function Settings() {
 
 function SettingsForm({ t, busyCourts }: { t: Tournament; busyCourts: Set<string> }) {
   const update = useStore((s) => s.updateTournament);
-  const reset = useStore((s) => s.resetDemo);
-  const [f, setF] = useState(t);
-  const [confirm, setConfirm] = useState(false);
-  const dirty = JSON.stringify(f) !== JSON.stringify(t);
+  const setStage = useStore((s) => s.setStage);
+  // Only the fields this form edits: saving never overwrites the stage, courts or match numbers
+  // changed elsewhere since the page was opened. Unsaved edits are kept until saved or discarded.
+  const saved = { name: t.name, venue: t.venue, city: t.city, status: t.status, restMinutes: t.restMinutes, rules: t.rules };
+  type Fields = typeof saved;
+  // the draft stores only the fields that were changed, so it never brings back stale values
+  const [patch, setPatch, clearDraft] = usePersistentState<Partial<Fields>>(`settings:${t.id}`, {});
+  const f: Fields = { ...saved, ...patch };
+  const setF = (next: Fields) =>
+    setPatch(
+      Object.fromEntries(
+        (Object.keys(saved) as (keyof Fields)[]).filter((k) => next[k] !== saved[k]).map((k) => [k, next[k]]),
+      ) as Partial<Fields>,
+    );
+  const { ask, dialog } = useConfirm();
+  const dirty = (Object.keys(saved) as (keyof typeof saved)[]).some((k) => f[k] !== saved[k]);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-10">
+    <div className="flex max-w-3xl flex-col gap-6">
       <PageHeader eyebrow={t.name} title="Settings" description="Tournament details, courts, your team and how this device looks." />
 
       <section aria-labelledby="set-details">
         <SectionHead title={<span id="set-details">Tournament details</span>} description="Players see these on the public page." />
-        <div className="panel grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+        <div className="panel grid gap-5 p-5 sm:grid-cols-2 sm:p-5">
           <Field label="Name" className="sm:col-span-2">
             {(id) => <Input id={id} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />}
           </Field>
@@ -68,6 +83,7 @@ function SettingsForm({ t, busyCourts }: { t: Tournament; busyCourts: Set<string
               <Select id={id} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as Tournament['status'] })}>
                 <option value="draft">Draft (hidden)</option>
                 <option value="registration">Registration open</option>
+                <option value="closed">Registration closed (making draws)</option>
                 <option value="live">Live</option>
                 <option value="completed">Completed</option>
               </Select>
@@ -101,7 +117,11 @@ function SettingsForm({ t, busyCourts }: { t: Tournament; busyCourts: Set<string
               disabled={!dirty}
               icon={<Icon name="check" size={18} />}
               onClick={() => {
-                update(t.id, f);
+                const { status, ...details } = f;
+                update(t.id, details);
+                // stage changes go through the stage action so players get the announcement
+                if (status !== t.status) setStage(t.id, status);
+                clearDraft();
                 toast('Settings saved');
               }}
             >
@@ -109,9 +129,21 @@ function SettingsForm({ t, busyCourts }: { t: Tournament; busyCourts: Set<string
             </Button>
             {dirty ? (
               <>
-                <Button variant="ghost" onClick={() => setF(t)}>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    ask({
+                      title: 'Discard your changes?',
+                      body: 'The tournament details go back to what was last saved.',
+                      confirmLabel: 'Discard',
+                      danger: true,
+                      onConfirm: clearDraft,
+                    })
+                  }
+                >
                   Discard
                 </Button>
+                {dialog}
                 <span className="text-[13px] text-warn">You have unsaved changes.</span>
               </>
             ) : (
@@ -184,26 +216,7 @@ function SettingsForm({ t, busyCourts }: { t: Tournament; busyCourts: Set<string
 
       <TeamSection orgId={t.organizationId} />
 
-      <section aria-labelledby="set-demo">
-        <SectionHead title={<span id="set-demo">Demo data</span>} />
-        <div className="panel flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="text-[14px] font-semibold">Start over</div>
-            <div className="text-[13px] text-muted">Puts every tournament back to the starting demo state. This can't be undone.</div>
-          </div>
-          <Button
-            variant={confirm ? 'danger' : 'secondary'}
-            icon={<Icon name="refresh" size={18} />}
-            onClick={() => {
-              if (!confirm) return setConfirm(true);
-              reset();
-              setConfirm(false);
-            }}
-          >
-            {confirm ? 'Tap again to reset' : 'Reset demo data'}
-          </Button>
-        </div>
-      </section>
+      <ResetSection t={t} />
     </div>
   );
 }

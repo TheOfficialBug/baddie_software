@@ -162,7 +162,7 @@ export function PlayerDetail({
   const onCourt = upcoming.some((m) => m.status === 'on_court');
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {header && (
         <div className="flex flex-col gap-4">
           {back && (
@@ -173,7 +173,7 @@ export function PlayerDetail({
               <Icon name="left" size={18} /> All players
             </Link>
           )}
-          <div className="panel flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+          <div className="panel flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-5">
             <div className="flex min-w-0 flex-1 items-center gap-4">
               <Avatar name={p.name} size={64} />
               <div className="min-w-0">

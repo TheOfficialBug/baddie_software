@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/cn';
 
@@ -57,6 +58,10 @@ export function Combobox({
   const [active, setActive] = useState(-1);
   const wrap = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLUListElement>(null);
+  // The list floats above everything (fixed, in the dialog's top layer when inside one), so a
+  // scrolling dialog body or a card with overflow never clips it.
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxH: number } | null>(null);
   const listId = useId();
 
   const q = norm(value);
@@ -78,9 +83,39 @@ export function Combobox({
   const showCustom = !!customLabel && !!q && !exact;
   const rows = hits.length + (showCustom ? 1 : 0);
 
+  const showing = open && rows > 0;
+  useLayoutEffect(() => {
+    if (!showing) return;
+    const place = () => {
+      const r = input.current?.getBoundingClientRect();
+      if (!r) return;
+      const below = window.innerHeight - r.bottom - 12;
+      const above = r.top - 12;
+      // open upwards when there's little room below (e.g. a field near the bottom of a sheet)
+      const up = below < 220 && above > below;
+      setPos({
+        left: r.left,
+        width: r.width,
+        ...(up ? { bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6 }),
+        maxH: Math.max(140, Math.min(288, up ? above : below)),
+      });
+    };
+    place();
+    // follow the field while the page or dialog scrolls (but not when the list itself scrolls)
+    const onScroll = (e: Event) => !list.current?.contains(e.target as Node) && place();
+    window.addEventListener('resize', place);
+    document.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      document.removeEventListener('scroll', onScroll, true);
+    };
+  }, [showing]);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
+    const close = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!wrap.current?.contains(t) && !list.current?.contains(t)) setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
@@ -150,58 +185,63 @@ export function Combobox({
       >
         <Icon name="down" size={18} className={cn('transition-transform duration-150', open && 'rotate-180')} />
       </button>
-      {open && rows > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label="Suggestions"
-          className="scroll-thin absolute inset-x-0 top-full z-40 mt-1.5 max-h-72 animate-rise overflow-y-auto rounded-2xl border border-line bg-raised p-1.5 text-[15px] text-fg shadow-pop"
-        >
-          {hits.map((o, i) => {
-            const on = norm(o.value) === q;
-            return (
-              // Keyboard selection happens on the input (aria-activedescendant); options take pointer input.
+      {showing &&
+        pos &&
+        createPortal(
+          <ul
+            ref={list}
+            id={listId}
+            role="listbox"
+            aria-label="Suggestions"
+            className="scroll-thin fixed z-[80] animate-rise overflow-y-auto rounded-2xl border border-line bg-raised p-1.5 text-[15px] text-fg shadow-pop"
+            style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxH }}
+          >
+            {hits.map((o, i) => {
+              const on = norm(o.value) === q;
+              return (
+                // Keyboard selection happens on the input (aria-activedescendant); options take pointer input.
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events
+                <li
+                  key={o.value}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={on}
+                  onMouseEnter={() => setActive(i)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => pick(o)}
+                  className={cn('flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2', i === active && 'bg-sunken')}
+                >
+                  {o.icon && <Icon name={o.icon} size={17} className="shrink-0 text-muted" />}
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('block truncate', on && 'font-semibold')}>{o.value}</span>
+                    {o.hint && <span className="block truncate text-[12.5px] text-muted">{o.hint}</span>}
+                  </span>
+                  {on && <Icon name="check" size={17} strokeWidth={2.2} />}
+                </li>
+              );
+            })}
+            {showCustom && (
               // eslint-disable-next-line jsx-a11y/click-events-have-key-events
               <li
-                key={o.value}
-                id={`${listId}-${i}`}
+                id={`${listId}-${hits.length}`}
                 role="option"
-                aria-selected={on}
-                onMouseEnter={() => setActive(i)}
+                aria-selected={false}
+                onMouseEnter={() => setActive(hits.length)}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(o)}
-                className={cn('flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2', i === active && 'bg-sunken')}
+                onClick={keepTyped}
+                className={cn(
+                  'flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[14.5px]',
+                  hits.length > 0 && 'mt-1 border-t border-line pt-2.5',
+                  active === hits.length && 'bg-sunken',
+                )}
               >
-                {o.icon && <Icon name={o.icon} size={17} className="shrink-0 text-muted" />}
-                <span className="min-w-0 flex-1">
-                  <span className={cn('block truncate', on && 'font-semibold')}>{o.value}</span>
-                  {o.hint && <span className="block truncate text-[12.5px] text-muted">{o.hint}</span>}
-                </span>
-                {on && <Icon name="check" size={17} strokeWidth={2.2} />}
+                <Icon name="plus" size={17} className="shrink-0 text-muted" />
+                <span className="min-w-0 flex-1 break-words leading-snug">{customLabel(value.trim())}</span>
               </li>
-            );
-          })}
-          {showCustom && (
-            // eslint-disable-next-line jsx-a11y/click-events-have-key-events
-            <li
-              id={`${listId}-${hits.length}`}
-              role="option"
-              aria-selected={false}
-              onMouseEnter={() => setActive(hits.length)}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={keepTyped}
-              className={cn(
-                'flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-[14.5px]',
-                hits.length > 0 && 'mt-1 border-t border-line pt-2.5',
-                active === hits.length && 'bg-sunken',
-              )}
-            >
-              <Icon name="plus" size={17} className="shrink-0 text-muted" />
-              <span className="min-w-0 flex-1 break-words leading-snug">{customLabel(value.trim())}</span>
-            </li>
-          )}
-        </ul>
-      )}
+            )}
+          </ul>,
+          wrap.current?.closest('dialog') ?? document.body,
+        )}
     </div>
   );
 }

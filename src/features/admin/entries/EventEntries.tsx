@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { rulesSummary } from '@/engine/rules';
-import type { Entry, TEvent, Tournament } from '@/engine/types';
+import type { Entry, SkillLevel, TEvent, Tournament } from '@/engine/types';
 
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
@@ -10,10 +10,12 @@ import { money } from '@/lib/format';
 import { eligibility, isDoubles } from '@/data/eligibility';
 import { type Lookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
+import { toast } from '@/data/toast';
 
 import { modeSummary } from '@/components/draw/modeLabels';
 import { GLOSSARY } from '@/components/help/glossary';
 import { EventChip, Pill, SeedTag } from '@/components/tournament/Badges';
+import { levelLabel, SKILL_LEVELS } from '@/components/tournament/skillLevels';
 import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
 import { Empty } from '@/components/ui/Empty';
 import { HelpTip } from '@/components/ui/HelpTip';
@@ -27,7 +29,7 @@ import { AddEntryDialog } from '@/features/admin/entries/AddEntryDialog';
 const seedHelp = GLOSSARY.find((g) => g.term === 'Seed')?.body;
 
 export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament; ev: TEvent; onEdit: () => void }) {
-  const updatePlayer = useStore((s) => s.updatePlayer);
+  const setLevel = useStore((s) => s.setEntryLevel);
   const setStatus = useStore((s) => s.setEntryStatus);
   const [filter, setFilter] = useState<'all' | Entry['status']>('all');
   const [adding, setAdding] = useState(false);
@@ -41,12 +43,12 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
 
   return (
     <section className="flex min-w-0 flex-col gap-4" aria-label={ev.name}>
-      <div className="panel flex flex-col gap-4 p-5 sm:p-6">
+      <div className="panel flex flex-col gap-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <EventChip kind={ev.kind} />
-              <h2 className="min-w-0 truncate font-display text-[clamp(20px,2.4vw,24px)] font-extrabold leading-tight">{ev.name}</h2>
+              <h2 className="min-w-0 truncate font-display text-[18px] font-extrabold leading-tight sm:text-[20px]">{ev.name}</h2>
             </div>
             <p className="mt-1.5 text-[14px] text-muted">{modeSummary(ev)}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -147,27 +149,36 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
                     <SeedTag seed={e.seed} />
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    {ps.map((p) => (
-                      <label
-                        key={p.id}
+                    {/* levels given for this event at registration; fix a wrong pick here (seeding uses them) */}
+                    {[
+                      ...ps.map((p, i) => ({ key: p.id, name: p.name, level: e.levels?.[i] ?? p.level })),
+                      ...(e.pendingPartner ? [{ key: 'partner', name: e.pendingPartner.name, level: e.pendingPartner.level }] : []),
+                    ].map((x, slot, all) => (
+                      <span
+                        key={x.key}
                         className="inline-flex items-center gap-1 rounded-full bg-sunken py-0.5 pl-2.5 pr-1 text-[12px] font-semibold"
-                        title={`${p.name}'s skill level (used for pairing)`}
+                        title={`${x.name}'s level in ${ev.name} (used for seeding and pairing)`}
                       >
-                        {ps.length > 1 ? p.name.split(' ')[0] : 'Level'}
+                        {all.length > 1 ? x.name.split(' ')[0] : 'Level'}
                         <Select
-                          aria-label={`Skill level for ${p.name}`}
-                          value={p.level}
-                          disabled={locked}
-                          onChange={(ev2) => updatePlayer(p.id, { level: ev2.target.value as typeof p.level })}
+                          aria-label={`Skill level for ${x.name}`}
+                          value={x.level}
+                          onChange={(ev2) => {
+                            const level = ev2.target.value as SkillLevel;
+                            setLevel(e.id, slot, level);
+                            toast(`${x.name} is now ${levelLabel(level)} in ${ev.name}`, {
+                              detail: locked ? 'The draw is already out; redo it to reseed with the new level.' : undefined,
+                            });
+                          }}
                           className="min-h-7 w-auto gap-1 rounded-full border-0 bg-surface px-2.5 py-0 text-[12px] font-bold"
                         >
-                          {(['A', 'B', 'C', 'D'] as const).map((l) => (
-                            <option key={l} value={l}>
-                              {l}
+                          {SKILL_LEVELS.map((l) => (
+                            <option key={l.value} value={l.value}>
+                              {l.value} · {l.title}
                             </option>
                           ))}
                         </Select>
-                      </label>
+                      </span>
                     ))}
                   </div>
                   <div className="mt-1 truncate text-[13px] text-muted">

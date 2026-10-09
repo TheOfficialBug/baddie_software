@@ -49,7 +49,25 @@ export function readyQueue(
     });
 
   const score = (q: QueueItem) => (q.blocked ? 2 : q.resting ? 1 : 0);
-  return items.sort((x, y) => score(x) - score(y) || x.match.number - y.match.number);
+  const turn = fairShareTurns(matches);
+  return items.sort((x, y) => score(x) - score(y) || turn(x.match) - turn(y.match) || x.match.number - y.match.number);
+}
+
+/**
+ * Events run in parallel on shared courts. Match numbers are handed out event by event, so plain
+ * number order would play one event's whole round before the next event starts. Instead events
+ * take turns: each ready match gets a turn = its place in its event's ready list plus how many of
+ * that event's matches are already on court. Lower turns go first; within an event the order
+ * stays by match number.
+ */
+export function fairShareTurns(matches: Match[]): (m: Match) => number {
+  const onCourt = new Map<ID, number>();
+  for (const m of matches) if (m.status === 'on_court') onCourt.set(m.eventId, (onCourt.get(m.eventId) ?? 0) + 1);
+  const rank = new Map<ID, number>();
+  const byEvent = new Map<ID, Match[]>();
+  for (const m of matches) if (m.status === 'ready') byEvent.set(m.eventId, [...(byEvent.get(m.eventId) ?? []), m]);
+  for (const [ev, ms] of byEvent) ms.sort((a, b) => a.number - b.number).forEach((m, i) => rank.set(m.id, i + (onCourt.get(ev) ?? 0)));
+  return (m) => rank.get(m.id) ?? Number.MAX_SAFE_INTEGER;
 }
 
 export type PlayerState = 'on_court' | 'resting' | 'ready' | 'waiting' | 'done';

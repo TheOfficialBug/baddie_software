@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { fmtDate, fmtDateRange } from '@/lib/format';
 
 import { isDoubles } from '@/data/eligibility';
@@ -11,7 +12,9 @@ import { useStore } from '@/data/store';
 import { useAccess } from '@/auth/useAccess';
 
 import { NotFound } from '@/components/NotFound';
+import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 import { AboutYouStep } from '@/features/public/register/AboutYouStep';
 import { DetailsStep } from '@/features/public/register/DetailsStep';
@@ -44,9 +47,10 @@ export function Register() {
   const { user, playerId } = useAccess();
   const linked = lk.player(playerId ?? undefined);
 
-  const [step, setStep] = useState(0);
+  const draftKey = (part: string) => (t && user ? `register.${part}:${t.id}:${user.id}` : null);
+  const [step, setStep, clearStep] = usePersistentState(draftKey('step'), 0);
   // Start from the account (and its player record, if this person has played before).
-  const [me, setMe] = useState<Registrant>(() => ({
+  const [me, setMe, clearMe] = usePersistentState<Registrant>(draftKey('me'), () => ({
     ...emptyRegistrant(),
     name: linked?.name ?? user?.name ?? '',
     email: user?.email ?? '',
@@ -54,8 +58,9 @@ export function Register() {
     birthYear: linked?.birthYear,
     club: linked?.club ?? '',
   }));
-  const [picked, setPicked] = useState<Picks>({});
+  const [picked, setPicked, clearPicked] = usePersistentState<Picks>(draftKey('picks'), {});
   const [done, setDone] = useState(false);
+  const { ask, dialog } = useConfirm();
   const [touched, setTouched] = useState(false);
 
   const events = t ? lk.eventsOf(t.id) : [];
@@ -102,6 +107,9 @@ export function Register() {
       ? (updatePlayer(linked.id, details), linked.id)
       : addPlayer({ ...details, email: me.email.trim(), userId: user?.id });
     register(t.id, pid, picks, total);
+    clearStep();
+    clearPicked();
+    clearMe();
     setDone(true);
   };
 
@@ -114,7 +122,7 @@ export function Register() {
         <Icon name="left" size={18} /> <span className="truncate">{t.name}</span>
       </Link>
       <div className="eyebrow">Registration · open until {fmtDate(t.regCloses ?? t.startDate)}</div>
-      <h1 className="mt-1.5 font-display text-[clamp(28px,4.2vw,40px)] font-extrabold leading-[1.05]">Enter {t.name}</h1>
+      <h1 className="mt-1.5 font-display text-[clamp(22px,3vw,30px)] font-extrabold leading-[1.1]">Enter {t.name}</h1>
       <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-muted">
         <span className="inline-flex items-center gap-1">
           <Icon name="calendar" size={16} /> {fmtDateRange(t.startDate, t.endDate)}
@@ -125,6 +133,32 @@ export function Register() {
       </p>
 
       <StepProgress step={step} onStep={(s) => s < step && goTo(s)} />
+      {(step > 0 || chosen.length > 0) && (
+        <div className="-mt-2 mb-3 flex justify-end">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Icon name="refresh" size={15} />}
+            onClick={() =>
+              ask({
+                title: 'Start your entry over?',
+                body: 'The events, levels and partners you picked are cleared and you go back to the first step. Nothing has been sent yet.',
+                confirmLabel: 'Start over',
+                danger: true,
+                onConfirm: () => {
+                  clearStep();
+                  clearPicked();
+                  clearMe();
+                  setTouched(false);
+                },
+              })
+            }
+          >
+            Start over
+          </Button>
+        </div>
+      )}
+      {dialog}
 
       {step === 0 && <AboutYouStep t={t} me={me} setMe={setMe} emailLocked={!!user} errors={touched ? meErrors : {}} />}
       {step === 1 && (

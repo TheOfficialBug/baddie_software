@@ -156,7 +156,8 @@ export interface Tournament {
   city: string;
   startDate: string; // ISO date
   endDate: string;
-  status: 'registration' | 'live' | 'completed' | 'draft';
+  /** draft → registration (open) → closed (entries frozen, draws being made) → live → completed */
+  status: 'draft' | 'registration' | 'closed' | 'live' | 'completed';
   regCloses?: string;
   rules: RulesId;
   /** default opening-round scoring for new events (e.g. one game to 30) */

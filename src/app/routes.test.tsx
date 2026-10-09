@@ -12,6 +12,8 @@ import { authActions, createLocalBackend, initAuth } from '@/auth/authStore';
 
 import { routes } from '@/app/routes';
 
+import { buildSampleData } from '@/test/fixtures/sampleTournaments';
+
 const OWNER = 'alex@smashboard.demo';
 const SCORER = 'sam@smashboard.demo';
 const PLAYER = 'player@smashboard.demo';
@@ -19,6 +21,8 @@ const PLAYER = 'player@smashboard.demo';
 let paths: string[] = [];
 
 beforeAll(async () => {
+  // a mid-tournament state (live matches, open registration, a finished event)
+  useStore.setState(buildSampleData());
   await initAuth(createLocalBackend());
   const s = useStore.getState();
   const live = s.tournaments.find((t) => t.status === 'live')!;
@@ -56,6 +60,7 @@ beforeAll(async () => {
     `${adm}/notify`,
     `${adm}/players`,
     `${adm}/settings`,
+    `${adm}/simulate`,
   ];
 });
 
@@ -104,7 +109,7 @@ describe('access', () => {
     expect(router.state.location.pathname).toBe(`/t/${live.slug}/draws`);
   });
 
-  it.each(['/me', '/account', '/admin', '/admin/t/t-fall/courts'])(
+  it.each(['/me', '/account', '/admin', '/admin/t/t-fall/scores'])(
     'signed-out visitors of %s are sent to sign in, then back',
     async (path) => {
       const { router } = await renderAt(path);
@@ -122,8 +127,12 @@ describe('access', () => {
 
   it('scorers run match day but cannot open draws, entries or settings', async () => {
     await authActions.signIn(SCORER, DEMO_PASSWORD);
-    let r = await renderAt('/admin/t/t-fall/courts');
-    expect(screen.getByRole('heading', { name: 'Courts' })).toBeInTheDocument();
+    let r = await renderAt('/admin/t/t-fall');
+    expect(screen.getByRole('region', { name: 'Tournament stage' })).toBeInTheDocument();
+    // the stage buttons are for admins; scorers see where things stand
+    expect(
+      screen.queryByRole('button', { name: /^(close registration|start match day|finish tournament|finish early)$/i }),
+    ).not.toBeInTheDocument();
     r.view.unmount();
     for (const page of ['draws', 'entries', 'settings']) {
       r = await renderAt(`/admin/t/t-fall/${page}`);

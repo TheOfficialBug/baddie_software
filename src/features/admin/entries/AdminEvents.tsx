@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 
 import type { TEvent } from '@/engine/types';
 
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 
 import { useLookup } from '@/data/lookup';
@@ -24,7 +25,7 @@ export function AdminEvents() {
   const lk = useLookup();
   const t = lk.tournament(tid);
   const events = t ? lk.eventsOf(t.id) : [];
-  const [sel, setSel] = useState<string | undefined>(events[0]?.id);
+  const [sel, setSel] = usePersistentState<string | undefined>(t ? `entries.event:${t.id}` : null, events[0]?.id);
   const [editing, setEditing] = useState<TEvent | 'new' | null>(null);
   if (!t) return <NotFound what="tournament" />;
   const ev = lk.event(sel) ?? events[0];

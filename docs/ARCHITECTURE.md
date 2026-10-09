@@ -65,8 +65,8 @@ A component file exports components only (fast refresh); helpers and constants g
 
 ### features/
 
-One folder per screen. A page file (`Dashboard.tsx`) owns state and layout; sections live next to it
-(`DashboardStats.tsx`, `TodoList.tsx`) with pure helpers in `.ts` files (`dashboardTodos.ts`).
+One folder per screen. A page file (`RunTournament.tsx`) owns state and layout; sections live next to it
+(`StageBar.tsx`, `DrawsStage.tsx`) with pure helpers in `.ts` files (`stages.ts`).
 Code used by a single feature stays inside that feature; promote it to `components/` or `data/` when a second feature needs it.
 
 ### app/

@@ -9,7 +9,6 @@ export const APP_NAME = 'Smashboard';
 export const STORAGE_KEYS = {
   db: 'smashboard.db',
   theme: 'smashboard.theme',
-  courtsTipHidden: 'smashboard.courtsTipHidden',
   /** demo mode only: signed-in account id and locally created accounts */
   demoSession: 'smashboard.demo.session',
   adminSidebar: 'smashboard.adminSidebar',

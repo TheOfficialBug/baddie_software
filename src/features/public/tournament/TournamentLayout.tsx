@@ -12,6 +12,7 @@ import { NotFound } from '@/components/NotFound';
 import { NoticeBell } from '@/components/notices/Notices';
 import { LiveDot, Pill } from '@/components/tournament/Badges';
 import { PlayerSearch } from '@/components/tournament/PlayerSearch';
+import { BackButton } from '@/components/ui/BackButton';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
@@ -58,7 +59,10 @@ export function TournamentLayout() {
       <header className="hero" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="mx-auto flex max-w-[1240px] flex-col gap-5 px-4 pt-4 sm:gap-6 sm:px-6 sm:pt-5 lg:px-10">
           <div className="flex items-center justify-between gap-3">
-            <Logo tone="hero" />
+            <div className="flex items-center gap-2.5">
+              <BackButton tone="hero" />
+              <Logo tone="hero" />
+            </div>
             <div className="flex items-center gap-1.5">
               <HelpButton tone="hero" />
               <NoticeBell tone="hero" tournamentId={t.id} />
@@ -88,6 +92,7 @@ export function TournamentLayout() {
                 {t.status === 'registration' && (
                   <Pill tone="lime">Registration open until {fmtDate(t.regCloses ?? t.startDate, { month: 'short', day: 'numeric' })}</Pill>
                 )}
+                {t.status === 'closed' && <Pill tone="hero">Registration closed · draws coming soon</Pill>}
                 {t.status === 'completed' && <Pill tone="hero">Completed</Pill>}
                 <Pill tone="hero" title={rules.note}>
                   Scoring {rules.short}

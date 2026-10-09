@@ -23,8 +23,8 @@ export function PageHeader({
 }) {
   useDocumentTitle(typeof title === 'string' ? title : undefined, 'Organizer');
   return (
-    <header className={cn('flex flex-wrap items-end justify-between gap-x-6 gap-y-4', className)}>
-      <div className="flex min-w-0 max-w-3xl flex-col gap-1.5">
+    <header className={cn('flex flex-wrap items-end justify-between gap-x-6 gap-y-3', className)}>
+      <div className="flex min-w-0 max-w-3xl flex-col gap-1">
         {crumbs && crumbs.length > 0 && (
           <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-[13px] text-muted">
             {crumbs.map((c, i) => (
@@ -42,8 +42,8 @@ export function PageHeader({
           </nav>
         )}
         {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-        <h1 className="font-display text-[clamp(28px,4.2vw,40px)] font-extrabold leading-[1.05]">{title}</h1>
-        {description && <p className="max-w-[62ch] text-[15px] text-muted">{description}</p>}
+        <h1 className="font-display text-[clamp(22px,3vw,30px)] font-extrabold leading-[1.1]">{title}</h1>
+        {description && <p className="max-w-[62ch] text-[14px] text-muted">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2.5">{actions}</div>}
     </header>

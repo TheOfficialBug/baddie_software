@@ -67,6 +67,18 @@ export interface OrgInvite {
   at: number;
 }
 
+/**
+ * Saved, unpublished edits to a published draw: who starts where (place key → entry, null = empty).
+ * `base` is the published seating it was made from; a redone draw makes it stale.
+ */
+export interface DrawDraft {
+  eventId: ID;
+  base: string;
+  seating: Record<string, ID | null>;
+  savedAt: number;
+  savedBy?: ID;
+}
+
 export interface DB {
   version: number;
   tournaments: Tournament[];
@@ -83,6 +95,7 @@ export interface DB {
   profiles: Profile[];
   members: Membership[];
   orgInvites: OrgInvite[];
+  drawDrafts: DrawDraft[];
 }
 
 export const emptyDB = (): DB => ({
@@ -101,4 +114,5 @@ export const emptyDB = (): DB => ({
   profiles: [],
   members: [],
   orgInvites: [],
+  drawDrafts: [],
 });

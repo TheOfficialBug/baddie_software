@@ -40,10 +40,10 @@ export function Overview() {
     .sort((a, b) => b.finishedAt! - a.finishedAt!)
     .slice(0, 6);
 
-  if (t.status === 'registration') return <RegistrationOverview />;
+  if (t.status === 'registration' || t.status === 'closed') return <RegistrationOverview />;
 
   return (
-    <div className="flex flex-col gap-8 sm:gap-10">
+    <div className="flex flex-col gap-6 sm:gap-6">
       <AnnouncementBanner tournamentId={t.id} />
       <Following />
 
@@ -139,7 +139,7 @@ export function Overview() {
       </section>
 
       {t.about && (
-        <section className="panel flex flex-col gap-2 p-5 sm:p-6">
+        <section className="panel flex flex-col gap-2 p-4 sm:p-5">
           <h2 className="font-display text-[20px] font-bold">About this tournament</h2>
           <p className="max-w-[70ch] text-[15px] text-muted">{t.about}</p>
           <p className="text-[14px] text-muted">

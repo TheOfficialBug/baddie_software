@@ -22,7 +22,7 @@ type Filter = 'all' | 'live' | 'upcoming' | 'completed';
 
 const bucket = (t: Tournament): Exclude<Filter, 'all'> =>
   t.status === 'live' ? 'live' : t.status === 'completed' ? 'completed' : 'upcoming';
-const ORDER: Record<Tournament['status'], number> = { live: 0, registration: 1, draft: 2, completed: 3 };
+const ORDER: Record<Tournament['status'], number> = { live: 0, closed: 1, registration: 2, draft: 3, completed: 4 };
 
 export function AdminHome() {
   const lk = useLookup();
@@ -51,7 +51,7 @@ export function AdminHome() {
   );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow={today}
         title="Your tournaments"

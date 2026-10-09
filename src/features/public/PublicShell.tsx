@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet, useMatch } from 'react-router';
+import { NavLink, Outlet, useLocation, useMatch } from 'react-router';
 
 import { APP_NAME } from '@/config/app';
 
@@ -11,8 +11,10 @@ import { useAccess } from '@/auth/useAccess';
 
 import { HelpButton } from '@/components/help/Help';
 import { NoticeBell } from '@/components/notices/Notices';
+import { BackButton } from '@/components/ui/BackButton';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
+import { isHomePath } from '@/components/ui/parentPath';
 import { ThemeSwitchButton, ThemeToggle } from '@/components/ui/ThemeToggle';
 
 import { AccountMenu } from '@/features/auth/AccountMenu';
@@ -27,6 +29,7 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
 export function PublicShell() {
   // Registration is a focused flow with its own action bar: no global tab bar on phones.
   const focused = !!useMatch('/t/:slug/register');
+  const { pathname } = useLocation();
   const { isOrganizer } = useAccess();
   // the organizer desk is only offered to tournament staff
   const nav = NAV.filter((n) => n.to !== '/admin' || isOrganizer);
@@ -34,7 +37,10 @@ export function PublicShell() {
     <div className="flex min-h-dvh flex-col">
       <header className="sticky z-40 border-b border-line bg-bg/90 backdrop-blur-md" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
         <div className="mx-auto flex h-16 max-w-[1240px] items-center gap-6 px-4 sm:px-6">
-          <Logo />
+          <div className="flex items-center gap-1">
+            {!isHomePath(pathname) && <BackButton className="-ml-2" />}
+            <Logo />
+          </div>
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
             {nav.map((n) => (
               <NavLink
@@ -63,7 +69,7 @@ export function PublicShell() {
           </div>
         </div>
       </header>
-      <main className="pb-safe-bar mx-auto w-full max-w-[1240px] flex-1 px-4 pt-6 sm:px-6 sm:pt-8">
+      <main className="pb-safe-bar mx-auto w-full max-w-[1240px] flex-1 px-4 pt-4 sm:px-6 sm:pt-5">
         <Outlet />
       </main>
       <Footer />

@@ -26,7 +26,7 @@ const messageOf = (e: unknown) => (e instanceof AuthError ? e.message : 'Somethi
 
 function Section({ icon, title, description, children }: { icon: IconName; title: string; description?: ReactNode; children: ReactNode }) {
   return (
-    <section className="panel grid gap-4 p-4 sm:p-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
+    <section className="panel grid gap-4 p-4 sm:p-5 md:grid-cols-[220px_minmax(0,1fr)] md:gap-6">
       <div className="flex items-start gap-3 md:flex-col md:gap-2">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sunken text-muted">
           <Icon name={icon} size={20} />

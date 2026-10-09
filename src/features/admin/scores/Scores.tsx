@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router';
 import type { Match } from '@/engine/types';
 
 import { useNow } from '@/hooks/useNow';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 import { fmtAgo, fmtElapsed } from '@/lib/format';
 
@@ -15,6 +16,8 @@ import { fmtDuration, matchDuration } from '@/components/match/matchTiming';
 import { ScoreForm } from '@/components/match/ScoreEntry';
 import { NotFound } from '@/components/NotFound';
 import { LiveDot, Pill } from '@/components/tournament/Badges';
+import { EventFilter } from '@/components/tournament/EventFilter';
+import { byEvent, type EventFilterValue } from '@/components/tournament/filterByEvent';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Empty } from '@/components/ui/Empty';
 import { Icon } from '@/components/ui/Icon';
@@ -35,7 +38,9 @@ export function Scores() {
   const { openScore } = useAdmin();
   const undo = useStore((s) => s.undo);
   const updates = useStore((s) => s.updates);
-  const [q, setQ] = useState<Q>('court');
+  const [q, setQ] = usePersistentState<Q>(tid ? `scores.tab:${tid}` : null, 'court');
+  // shared with the Courts page: pick MS once and both screens follow
+  const [evFilter, setEvFilter] = usePersistentState<EventFilterValue>(tid ? `events.filter:${tid}` : null, 'all');
   const [num, setNum] = useState('');
   const [isWide, setIsWide] = useState(() => window.matchMedia?.('(min-width: 1024px)').matches ?? true);
 
@@ -48,10 +53,13 @@ export function Scores() {
   }, []);
 
   const all = useMemo(() => (t ? lk.matchesOf(t.id).filter((m) => m.number > 0 && m.status !== 'bye') : []), [lk, t]);
+  const events = t ? lk.eventsOf(t.id) : [];
+  const shown: EventFilterValue = evFilter === 'all' || events.some((e) => e.id === evFilter) ? evFilter : 'all';
+  const mine = byEvent(all, shown);
   const lists: Record<Q, Match[]> = {
-    court: all.filter((m) => m.status === 'on_court').sort((a, b) => (a.calledAt ?? 0) - (b.calledAt ?? 0)),
-    ready: all.filter((m) => m.status === 'ready').sort((a, b) => a.number - b.number),
-    done: all.filter((m) => m.status === 'finished').sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0)),
+    court: mine.filter((m) => m.status === 'on_court').sort((a, b) => (a.calledAt ?? 0) - (b.calledAt ?? 0)),
+    ready: mine.filter((m) => m.status === 'ready').sort((a, b) => a.number - b.number),
+    done: mine.filter((m) => m.status === 'finished').sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0)),
   };
   const [selected, setSelected] = useState<string | null>(() => matchId ?? lists.court[0]?.id ?? null);
   useEffect(() => {
@@ -112,6 +120,12 @@ export function Scores() {
               Open
             </Button>
           </form>
+          <EventFilter
+            events={events}
+            value={shown}
+            onChange={setEvFilter}
+            countOf={(id) => byEvent(all, id).filter((m) => m.status === 'on_court').length}
+          />
           <Segmented
             label="Queue"
             value={q}
@@ -188,7 +202,7 @@ export function Scores() {
           </div>
         </section>
 
-        <section className="panel hidden min-w-0 p-5 sm:p-7 lg:block" aria-label="Score entry">
+        <section className="panel hidden min-w-0 p-4 sm:p-5 lg:block" aria-label="Score entry">
           {sel ? (
             <ScoreForm
               key={sel.id}

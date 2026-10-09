@@ -9,10 +9,8 @@ import type { Lookup } from '@/data/lookup';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 
-import { StepHead } from '@/features/admin/draws/StepHead';
-
-/** Step 3: reorder entries (drag or arrows); the top `seeds` rows are seeded. */
-export function SeedingStep({
+/** The seeding order (drag or arrows); the top `seeds` rows are seeded. Shown in a side panel. */
+export function SeedingList({
   lk,
   order,
   onOrderChange,
@@ -39,29 +37,22 @@ export function SeedingStep({
   };
 
   return (
-    <section aria-labelledby="db-seeding" className="min-w-0">
-      <StepHead
-        n={3}
-        id="db-seeding"
-        title="Check the seeding order"
-        action={
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={<Icon name="sparkles" size={16} />}
-            onClick={() => onOrderChange(order.slice().sort((a, b) => levelOf(b) - levelOf(a)))}
-          >
-            Sort by level
-          </Button>
-        }
-      />
-      <p className="mb-3 text-[14px] text-muted">
-        Drag a row, or use the arrows. The top <span className="num font-semibold text-fg">{seeds}</span> are seeded;{' '}
-        {(pairing ?? 'balanced') === 'random'
-          ? 'everyone else is drawn at random.'
-          : 'everyone else is ranked by skill level (ties drawn by lot).'}
-      </p>
-      <ol className="panel scroll-thin flex max-h-[480px] flex-col gap-1 overflow-y-auto p-2">
+    <section aria-label="Seeding order" className="flex min-w-0 flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <p className="min-w-0 flex-1 text-[13px] text-muted">
+          Drag a row or use the arrows. The top <span className="num font-semibold text-fg">{seeds}</span> are seeded;{' '}
+          {(pairing ?? 'balanced') === 'random' ? 'everyone else is drawn at random.' : 'everyone else is ranked by skill level.'}
+        </p>
+        <Button
+          size="sm"
+          className="shrink-0"
+          icon={<Icon name="sparkles" size={16} />}
+          onClick={() => onOrderChange(order.slice().sort((x, y) => levelOf(y) - levelOf(x)))}
+        >
+          Sort by level
+        </Button>
+      </div>
+      <ol className="flex flex-col gap-1">
         {order.map((id, i) => {
           const seeded = i < seeds;
           return (

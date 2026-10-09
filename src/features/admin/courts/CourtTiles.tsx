@@ -12,6 +12,7 @@ import { toast } from '@/data/toast';
 import { CourtCard } from '@/components/match/CourtCard';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 import { useAdmin } from '@/features/admin/adminContext';
 
@@ -54,7 +55,7 @@ export function FreeCourt({
         lk={lk}
         court={court}
         now={now}
-        className={cn('min-h-[200px]', over && 'border-primary bg-primary/10')}
+        className={cn('min-h-[160px]', over && 'border-primary bg-primary/10')}
         freeAction={
           dragging ? (
             <span className="text-[14px] font-semibold">Drop here to call</span>
@@ -79,8 +80,12 @@ export function FreeCourt({
 
 export function BusyCourt({ lk, court, m, now }: { lk: Lookup; court: Court; m: Match; now: number }) {
   const adjust = useStore((s) => s.adjustLive);
+  const setPoints = useStore((s) => s.setLivePoints);
   const back = useStore((s) => s.returnToQueue);
   const start = useStore((s) => s.startMatch);
+  const setLiveScore = useStore((s) => s.setLiveScore);
+  const { ask, dialog } = useConfirm();
+  const scored = m.games.length > 0 || !!(m.live && (m.live[0] || m.live[1]));
   const { openScore } = useAdmin();
   const rules = lk.matchRules(m);
   let wa = 0;
@@ -109,30 +114,54 @@ export function BusyCourt({ lk, court, m, now }: { lk: Lookup; court: Court; m: 
   );
 
   return (
-    <CourtCard
-      lk={lk}
-      court={court}
-      match={m}
-      now={now}
-      sideActions={sideActions}
-      onStart={() => start(m.id)}
-      footer={
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant={decided ? 'primary' : 'ink'} className="flex-1" onClick={() => openScore(m.id)}>
-            {decided ? 'Confirm result' : 'Enter score slip'}
-          </Button>
-          <IconButton
-            size="sm"
-            label="Return to queue"
-            onClick={() => {
-              back(m.id);
-              toast(`Match #${m.number} moved back to the queue`, { tone: 'info' });
-            }}
-          >
-            <Icon name="undo" size={18} />
-          </IconButton>
-        </div>
-      }
-    />
+    <>
+      <CourtCard
+        lk={lk}
+        court={court}
+        match={m}
+        now={now}
+        sideActions={sideActions}
+        onScoreInput={(side, points) => setPoints(m.id, side, points)}
+        onStart={() => start(m.id)}
+        footer={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant={decided ? 'primary' : 'ink'} className="flex-1" onClick={() => openScore(m.id)}>
+              {decided ? 'Confirm result' : 'Enter score slip'}
+            </Button>
+            {scored && (
+              <IconButton
+                size="sm"
+                label="Reset score"
+                onClick={() =>
+                  ask({
+                    title: `Reset the score on ${court.name}?`,
+                    body: `The live score of match #${m.number} goes back to 0–0. The match stays on court.`,
+                    confirmLabel: 'Reset score',
+                    danger: true,
+                    onConfirm: () => {
+                      setLiveScore(m.id, [], null);
+                      toast(`Score on ${court.name} reset to 0–0`, { tone: 'info' });
+                    },
+                  })
+                }
+              >
+                <Icon name="refresh" size={18} />
+              </IconButton>
+            )}
+            <IconButton
+              size="sm"
+              label="Return to queue"
+              onClick={() => {
+                back(m.id);
+                toast(`Match #${m.number} moved back to the queue`, { tone: 'info' });
+              }}
+            >
+              <Icon name="undo" size={18} />
+            </IconButton>
+          </div>
+        }
+      />
+      {dialog}
+    </>
   );
 }

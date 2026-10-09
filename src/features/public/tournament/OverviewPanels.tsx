@@ -62,7 +62,7 @@ export function ChampionsPanel() {
   const rows = lk.eventsOf(t.id).flatMap((ev) => champions(lk, ev).map((c) => ({ ev, c })));
   if (!rows.length) return null;
   return (
-    <section className="hero rounded-3xl p-5 sm:p-7" aria-label="Champions">
+    <section className="hero rounded-2xl p-4 sm:p-5" aria-label="Champions">
       <div className="mb-4 flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-full bg-primary text-primary-fg">
           <Icon name="trophy" size={22} />
@@ -120,17 +120,28 @@ export function RegistrationOverview() {
         </div>
       </section>
       <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
-        <div className="panel flex flex-col gap-3 p-5 sm:p-6">
+        <div className="panel flex flex-col gap-3 p-4 sm:p-5">
           <span className="eyebrow">Registration</span>
-          <div className="font-display text-[24px] font-extrabold leading-tight">
-            Closes {fmtDate(t.regCloses ?? t.startDate, { weekday: 'long', month: 'long', day: 'numeric' })}
-          </div>
-          <p className="text-[14px] text-muted">
-            Pick your events, invite your doubles partner and pay in one go. You'll get a notification when the draw is published.
-          </p>
-          <ButtonLink to={`/t/${t.slug}/register`} variant="primary" size="lg">
-            Register now
-          </ButtonLink>
+          {t.status === 'closed' ? (
+            <>
+              <div className="font-display text-[24px] font-extrabold leading-tight">Closed</div>
+              <p className="text-[14px] text-muted">
+                Entries are in and the organizers are making the draws. You'll get a notification as soon as each draw is published.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="font-display text-[24px] font-extrabold leading-tight">
+                Closes {fmtDate(t.regCloses ?? t.startDate, { weekday: 'long', month: 'long', day: 'numeric' })}
+              </div>
+              <p className="text-[14px] text-muted">
+                Pick your events, invite your doubles partner and pay in one go. You'll get a notification when the draw is published.
+              </p>
+              <ButtonLink to={`/t/${t.slug}/register`} variant="primary" size="lg">
+                Register now
+              </ButtonLink>
+            </>
+          )}
         </div>
         <div className="panel p-5 text-[14px]">
           <span className="eyebrow">Scoring</span>

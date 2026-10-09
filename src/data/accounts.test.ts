@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import * as accounts from '@/data/accounts';
-import { buildDemo } from '@/data/demo';
 import type { DB } from '@/data/types';
+
+import { buildSampleData as buildDemo } from '@/test/fixtures/sampleTournaments';
 
 let db: DB;
 beforeEach(() => {

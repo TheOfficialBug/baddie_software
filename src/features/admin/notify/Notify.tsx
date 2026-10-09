@@ -4,6 +4,7 @@ import { useParams } from 'react-router';
 import type { ID } from '@/engine/types';
 
 import { useNow } from '@/hooks/useNow';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 import { useLookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
@@ -11,7 +12,10 @@ import { toast } from '@/data/toast';
 import type { Notice } from '@/data/types';
 
 import { NotFound } from '@/components/NotFound';
+import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 import { NotifyComposer } from '@/features/admin/notify/NotifyComposer';
 import { type Audience, type Channel, CHANNELS, notifyRecipients, TEMPLATES } from '@/features/admin/notify/notifyOptions';
@@ -25,13 +29,16 @@ export function Notify() {
   const now = useNow(30000);
   const notices = useStore((s) => s.notices);
   const send = useStore((s) => s.sendNotice);
-  const [tpl, setTpl] = useState(0);
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [audience, setAudience] = useState<Audience>('all');
-  const [eventId, setEventId] = useState<ID>('');
-  const [channels, setChannels] = useState<Channel[]>(['app', 'sms']);
+  // the message being written is kept per tournament until it's sent
+  const k = (field: string) => (tid ? `notify.${field}:${tid}` : null);
+  const [tpl, setTpl] = usePersistentState(k('tpl'), 0);
+  const [title, setTitle] = usePersistentState(k('title'), '');
+  const [body, setBody] = usePersistentState(k('body'), '');
+  const [audience, setAudience] = usePersistentState<Audience>(k('audience'), 'all');
+  const [eventId, setEventId] = usePersistentState<ID>(k('event'), '');
+  const [channels, setChannels] = usePersistentState<Channel[]>(k('channels'), ['app', 'sms']);
   const [touched, setTouched] = useState(false);
+  const { ask, dialog } = useConfirm();
 
   const recipients = useMemo(() => (t ? notifyRecipients(lk, t, audience, eventId) : ([] as ID[])), [lk, t, audience, eventId]);
 
@@ -82,7 +89,33 @@ export function Notify() {
         eyebrow={t.name}
         title="Notifications"
         description="Tell players what's happening. Court calls go out automatically when you send a match to a court."
+        actions={
+          (title || body) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<Icon name="refresh" size={16} />}
+              onClick={() =>
+                ask({
+                  title: 'Clear this message?',
+                  body: 'The headline and text you wrote are removed. Nothing has been sent.',
+                  confirmLabel: 'Clear message',
+                  danger: true,
+                  onConfirm: () => {
+                    setTitle('');
+                    setBody('');
+                    setTpl(0);
+                    setTouched(false);
+                  },
+                })
+              }
+            >
+              Clear message
+            </Button>
+          )
+        }
       />
+      {dialog}
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <NotifyComposer

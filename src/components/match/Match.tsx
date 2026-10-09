@@ -11,12 +11,15 @@ import type { Lookup } from '@/data/lookup';
 import { DurationTag } from '@/components/match/Duration';
 import { gamesFor, matchContext, sideName } from '@/components/match/matchInfo';
 import { fmtDuration, matchDuration } from '@/components/match/matchTiming';
-import { EventChip, FlightBadge, LiveDot, StatusPill } from '@/components/tournament/Badges';
+import { EventChip, FlightBadge, StatusPill } from '@/components/tournament/Badges';
 import { Icon } from '@/components/ui/Icon';
 
 const involves = (lk: Lookup, m: Match, pid?: string | null) => !!pid && [m.a, m.b].some((e) => lk.entry(e)?.playerIds.includes(pid));
 
-/** Compact bracket card (design: .m / .side / .mfoot). */
+/**
+ * Compact bracket box (Challonge-style): two 24px rows with seed, name and game scores; the match
+ * number sits in a narrow gutter that also shows the state (court when live, up next when ready).
+ */
 export function BracketMatch({
   lk,
   m,
@@ -31,82 +34,102 @@ export function BracketMatch({
   const isBye = m.status === 'bye';
   const dim = !!highlight && !involves(lk, m, highlight);
   const tid = lk.event(m.eventId)!.tournamentId;
+  const court = m.status === 'on_court' ? lk.courtName(tid, m.courtId) : '';
   const foot =
     m.status === 'on_court'
-      ? `${lk.courtName(tid, m.courtId)} · live`
+      ? `${court} · live`
       : m.status === 'finished'
         ? m.result === 'walkover'
           ? 'Walkover'
           : m.result === 'retired'
             ? 'Retired'
-            : 'Final'
+            : `Final${matchDuration(m) !== undefined ? ` · ${fmtDuration(matchDuration(m)!)}` : ''}`
         : isBye
           ? 'Bye'
           : m.status === 'ready'
             ? 'Up next'
             : m.loserTo
-              ? `Loser → ${m.loserTo}`
+              ? `Waiting · loser → ${m.loserTo}`
               : 'Waiting';
   const Comp = onOpen && !isBye ? 'button' : 'div';
   return (
     <Comp
       type={Comp === 'button' ? 'button' : undefined}
       onClick={Comp === 'button' ? () => onOpen!(m) : undefined}
+      title={`${m.number > 0 ? `#${m.number} · ` : ''}${foot}`}
+      aria-label={Comp === 'button' ? `Match ${m.number}: ${sideName(lk, m, 'a')} vs ${sideName(lk, m, 'b')}, ${foot}` : undefined}
       className={cn(
-        'relative block w-full overflow-hidden rounded-xl border bg-surface text-left transition-[opacity,border-color]',
-        m.status === 'on_court' ? 'border-live shadow-[0_0_0_1px_rgb(var(--live))]' : 'border-line',
+        'relative flex w-full overflow-hidden rounded-md border bg-surface text-left transition-[opacity,border-color]',
+        m.status === 'on_court' ? 'border-live' : 'border-line-strong/70',
         isBye && 'border-dashed bg-transparent',
         dim && 'opacity-30',
-        Comp === 'button' && 'hover:border-fg/50',
+        Comp === 'button' && 'hover:border-fg/60',
       )}
     >
-      {(['a', 'b'] as Side[]).map((side, i) => {
-        const slot = m[side];
-        const entry = lk.entry(slot);
-        const won = m.status === 'finished' && m.winner === side;
-        const lost = m.status === 'finished' && !!m.winner && m.winner !== side;
-        const mine = involves(lk, { ...m, a: side === 'a' ? m.a : null, b: side === 'b' ? m.b : null }, highlight);
-        const sc = gamesFor(m, side);
-        const other = gamesFor(m, side === 'a' ? 'b' : 'a');
-        return (
-          <div
-            key={side}
-            className={cn(
-              'flex min-h-8 items-center gap-2 px-2.5 py-1.5 text-[13px]',
-              i > 0 && 'border-t border-line',
-              won && 'font-bold',
-              (lost || !slot || slot === 'BYE') && 'text-muted',
-              mine && 'bg-primary/25',
-            )}
-          >
-            <span className="num w-[18px] shrink-0 text-[10px] font-semibold text-muted">{entry?.seed ?? ''}</span>
-            <span className={cn('min-w-0 flex-1 truncate', (!slot || slot === 'BYE') && 'italic')}>{sideName(lk, m, side)}</span>
-            {sc.map((g, gi) => (
-              <span
-                key={gi}
-                className={cn(
-                  'num w-6 shrink-0 text-right text-[13px] font-semibold',
-                  m.status === 'on_court' && gi === sc.length - 1 && m.live
-                    ? 'text-live'
-                    : g > (other[gi] ?? -1)
-                      ? 'text-fg'
-                      : 'text-muted',
-                )}
-              >
-                {g}
-              </span>
-            ))}
-          </div>
-        );
-      })}
-      <div className="flex items-center gap-1.5 bg-sunken px-2.5 py-1 text-[11px] font-semibold text-muted">
-        {m.status === 'on_court' && <LiveDot className="text-live" />}
-        {m.number > 0 && <span className="num">#{m.number}</span>}
-        <span className={cn('truncate', m.status === 'on_court' && 'text-live')}>{foot}</span>
-        {m.status === 'finished' && matchDuration(m) !== undefined && (
-          <span className="num ml-auto shrink-0">{fmtDuration(matchDuration(m)!)}</span>
+      <span
+        className={cn(
+          'num flex w-8 shrink-0 flex-col items-center justify-center gap-0.5 border-r text-[10.5px] font-semibold leading-none',
+          m.status === 'on_court'
+            ? 'border-live bg-live text-white'
+            : m.status === 'ready'
+              ? 'border-line bg-primary/30 text-fg'
+              : 'border-line bg-sunken text-muted',
         )}
-      </div>
+        aria-hidden
+      >
+        {m.number > 0 ? m.number : ''}
+        {m.status === 'on_court' && <span className="text-[9.5px] font-bold">{court.replace(/^court\s*/i, 'C').slice(0, 4)}</span>}
+      </span>
+      <span className="relative min-w-0 flex-1">
+        {(['a', 'b'] as Side[]).map((side, i) => {
+          const slot = m[side];
+          const entry = lk.entry(slot);
+          const won = m.status === 'finished' && m.winner === side;
+          const lost = m.status === 'finished' && !!m.winner && m.winner !== side;
+          const mine = involves(lk, { ...m, a: side === 'a' ? m.a : null, b: side === 'b' ? m.b : null }, highlight);
+          const sc = gamesFor(m, side);
+          const other = gamesFor(m, side === 'a' ? 'b' : 'a');
+          return (
+            <span
+              key={side}
+              className={cn(
+                'flex h-7 items-center gap-1 pl-2 text-[12.5px]',
+                i > 0 && 'border-t border-line',
+                won && 'font-bold',
+                (lost || !slot || slot === 'BYE') && 'text-muted',
+                mine && 'bg-primary/25',
+              )}
+            >
+              <span className={cn('min-w-0 flex-1 truncate', (!slot || slot === 'BYE') && 'italic text-faint')}>
+                {sideName(lk, m, side)}
+                {entry?.seed ? <span className="num ml-1 text-[10px] font-semibold text-muted">[{entry.seed}]</span> : null}
+              </span>
+              {sc.map((g, gi) => (
+                <span
+                  key={gi}
+                  className={cn(
+                    'num flex h-full w-6 shrink-0 items-center justify-center text-[12px] font-semibold',
+                    m.status === 'on_court' && gi === sc.length - 1 && m.live
+                      ? 'text-live'
+                      : g > (other[gi] ?? -1)
+                        ? 'bg-fg/[0.08] text-fg'
+                        : 'text-muted',
+                  )}
+                >
+                  {g}
+                </span>
+              ))}
+            </span>
+          );
+        })}
+        {/* the divider between the two sides reads as a versus */}
+        <span
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-1 text-[8.5px] font-bold uppercase leading-[11px] tracking-wider text-muted"
+          aria-hidden
+        >
+          vs
+        </span>
+      </span>
     </Comp>
   );
 }

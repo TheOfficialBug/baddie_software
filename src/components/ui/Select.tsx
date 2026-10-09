@@ -57,7 +57,8 @@ export function Select({
   disabled,
   className,
   'aria-label': ariaLabel,
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+  placeholder = 'Choose…',
+}: SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }) {
   const options = optionsFrom(children);
   const current = String(value ?? '');
   const selected = options.find((o) => o.value === current);
@@ -188,7 +189,7 @@ export function Select({
         }}
         className={cn('field flex items-center gap-2 text-left', open && 'border-info ring-[3px] ring-info/20', className)}
       >
-        <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-faint')}>{selected?.label ?? 'Choose…'}</span>
+        <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-faint')}>{selected?.label ?? placeholder}</span>
         <Icon name="down" size={18} className={cn('shrink-0 text-muted transition-transform duration-150', open && 'rotate-180')} />
       </button>
       {open &&

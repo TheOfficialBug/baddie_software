@@ -6,7 +6,7 @@ import type { EventKind, RulesId, TEvent } from '@/engine/types';
 
 import { addDaysISO, todayISO } from '@/lib/format';
 
-import { KIND_LABEL } from '@/data/demo';
+import { KIND_LABEL } from '@/data/catalog';
 import { useStore } from '@/data/store';
 import { toast } from '@/data/toast';
 

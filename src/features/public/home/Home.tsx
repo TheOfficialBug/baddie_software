@@ -22,7 +22,8 @@ export function Home() {
   const [q, setQ] = useState('');
   const match = (t: Tournament) => !q.trim() || `${t.name} ${t.city} ${t.venue}`.toLowerCase().includes(q.trim().toLowerCase());
   const live = lk.tournaments.filter((t) => t.status === 'live' && match(t));
-  const open = lk.tournaments.filter((t) => t.status === 'registration' && match(t));
+  // open for entries, or closed and waiting for the draw
+  const open = lk.tournaments.filter((t) => (t.status === 'registration' || t.status === 'closed') && match(t));
   const done = lk.tournaments.filter((t) => t.status === 'completed' && match(t));
   const firstLive = lk.tournaments.find((t) => t.status === 'live');
   const firstOpen = lk.tournaments.find((t) => t.status === 'registration');
@@ -53,7 +54,7 @@ export function Home() {
 
   return (
     <div className="flex flex-col gap-12">
-      <section className="hero relative overflow-hidden rounded-3xl px-5 py-8 sm:px-10 sm:py-12">
+      <section className="hero relative overflow-hidden rounded-2xl px-5 py-8 sm:px-10 sm:py-12">
         <div className="relative z-10 flex max-w-2xl flex-col gap-4">
           <span className="eyebrow text-hero-muted">Badminton tournaments, live</span>
           <h1 className="font-display text-[clamp(34px,6vw,60px)] font-extrabold leading-[1.02]">
@@ -157,7 +158,7 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
   const players = new Set(events.flatMap((e) => lk.entriesOf(e.id).flatMap((x) => x.playerIds))).size;
 
   return (
-    <div className="panel panel-hover relative flex flex-col gap-4 p-5 sm:p-6">
+    <div className="panel panel-hover relative flex flex-col gap-4 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           {t.status === 'live' && (
@@ -168,6 +169,11 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
           {t.status === 'registration' && (
             <Pill tone="info" className="mb-1 self-start">
               Registration closes {fmtDate(t.regCloses ?? t.startDate, { month: 'short', day: 'numeric' })}
+            </Pill>
+          )}
+          {t.status === 'closed' && (
+            <Pill tone="muted" className="mb-1 self-start">
+              Registration closed · draws coming soon
             </Pill>
           )}
           {t.status === 'completed' && (

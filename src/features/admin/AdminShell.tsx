@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useMatch, useMatches, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useMatch, useMatches, useNavigate } from 'react-router';
 
 import { APP_NAME, STORAGE_KEYS } from '@/config/app';
 
@@ -9,7 +9,7 @@ import { safeStorage } from '@/lib/storage';
 import { useLookup } from '@/data/lookup';
 import { toast } from '@/data/toast';
 
-import { authActions } from '@/auth/authStore';
+import { authActions, useAuth } from '@/auth/authStore';
 import { type Capability, ROLE_LABEL, type RouteHandle } from '@/auth/permissions';
 import { useAccess } from '@/auth/useAccess';
 
@@ -17,9 +17,11 @@ import { HelpButton } from '@/components/help/Help';
 import { ScoreDialog } from '@/components/match/ScoreEntry';
 import { LiveDot } from '@/components/tournament/Badges';
 import { Avatar } from '@/components/ui/Avatar';
+import { BackButton } from '@/components/ui/BackButton';
 import { ButtonLink, IconButton } from '@/components/ui/Button';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Logo, ShuttleMark } from '@/components/ui/Logo';
+import { isHomePath } from '@/components/ui/parentPath';
 import { Select } from '@/components/ui/Select';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -32,6 +34,8 @@ type NavItem = { to: string; label: string; icon: IconName; end?: boolean; badge
 export function AdminShell() {
   const lk = useLookup();
   const access = useAccess();
+  // the simulator plays matches with made-up results: test runs on demo data only
+  const demo = useAuth((s) => s.backend?.kind === 'demo');
   const m = useMatch('/admin/t/:tid/*');
   const tid = m?.params.tid;
   const t = lk.tournament(tid);
@@ -43,6 +47,7 @@ export function AdminShell() {
   // Desktop sidebar: full, or a narrow icon rail. Remembered on this device.
   const [collapsed, setCollapsed] = useState(() => safeStorage.get(STORAGE_KEYS.adminSidebar) === 'collapsed');
   const nav = useNavigate();
+  const { pathname } = useLocation();
   const ctx = useMemo(() => ({ openScore: setScoreFor, openSearch: () => setPalette(true) }), []);
 
   const toggleCollapsed = useCallback(
@@ -81,28 +86,34 @@ export function AdminShell() {
   const allGroups: { title: string; items: NavItem[] }[] = t
     ? [
         {
-          title: 'Match day',
-          items: [
-            { to: `/admin/t/${t.id}`, label: 'Dashboard', icon: 'dashboard', end: true },
-            { to: `/admin/t/${t.id}/courts`, label: 'Courts', icon: 'location', live: onCourt > 0 },
-            { to: `/admin/t/${t.id}/scores`, label: 'Live scoring', icon: 'whistle', badge: onCourt || undefined },
-            { to: `/admin/t/${t.id}/players`, label: 'Live players', icon: 'users' },
-            { to: `/admin/t/${t.id}/notify`, label: 'Notifications', icon: 'megaphone' },
-          ],
+          // one home that follows the stage: registration, draws, the court board, winners
+          title: '',
+          items: [{ to: `/admin/t/${t.id}`, label: 'Run tournament', icon: 'dashboard', end: true, live: onCourt > 0 }],
         },
         {
-          title: 'Prepare',
+          title: 'Details',
           items: [
             {
               to: `/admin/t/${t.id}/entries`,
-              label: 'Registrations',
+              label: 'Entries',
               icon: 'userAdd',
               badge: pendingEntries || undefined,
               cap: 'manage_entries',
             },
             { to: `/admin/t/${t.id}/draws`, label: 'Draws', icon: 'draws', cap: 'manage_draws' },
+            { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
+            { to: `/admin/t/${t.id}/notify`, label: 'Messages', icon: 'megaphone' },
+          ],
+        },
+        {
+          title: 'More',
+          items: [
+            { to: `/admin/t/${t.id}/scores`, label: 'All results', icon: 'whistle' },
             { to: `/admin/t/${t.id}/slips`, label: 'Score slips', icon: 'print' },
-            { to: `/admin/t/${t.id}/settings`, label: 'Tournament settings', icon: 'settings', cap: 'manage_settings' },
+            { to: `/admin/t/${t.id}/settings`, label: 'Settings', icon: 'settings', cap: 'manage_settings' },
+            ...(demo
+              ? [{ to: `/admin/t/${t.id}/simulate`, label: 'Simulator', icon: 'sparkles' as const, cap: 'manage_settings' as const }]
+              : []),
           ],
         },
       ]
@@ -183,7 +194,12 @@ export function AdminShell() {
         )}
         {groups.map((g) => (
           <div key={g.title} className="flex flex-col gap-0.5">
-            {rail ? <span className="mx-auto mb-1 h-px w-6 bg-line" aria-hidden /> : <div className="eyebrow mb-1 px-3.5">{g.title}</div>}
+            {g.title &&
+              (rail ? (
+                <span className="mx-auto mb-1 h-px w-6 bg-line" aria-hidden />
+              ) : (
+                <div className="eyebrow mb-1 px-3.5">{g.title}</div>
+              ))}
             {g.items.map((it) => navLink(it, rail))}
           </div>
         ))}
@@ -217,12 +233,14 @@ export function AdminShell() {
   );
 
   const bottom: NavItem[] = t
-    ? [
-        { to: `/admin/t/${t.id}`, label: 'Home', icon: 'dashboard', end: true },
-        { to: `/admin/t/${t.id}/courts`, label: 'Courts', icon: 'location', live: onCourt > 0 },
-        { to: `/admin/t/${t.id}/scores`, label: 'Scores', icon: 'whistle' },
-        { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
-      ]
+    ? (
+        [
+          { to: `/admin/t/${t.id}`, label: 'Run', icon: 'dashboard', end: true, live: onCourt > 0 },
+          { to: `/admin/t/${t.id}/entries`, label: 'Entries', icon: 'userAdd', cap: 'manage_entries' },
+          { to: `/admin/t/${t.id}/draws`, label: 'Draws', icon: 'draws', cap: 'manage_draws' },
+          { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
+        ] satisfies NavItem[]
+      ).filter(allowed)
     : [];
 
   // Access for the page being shown: staff of this tournament's organization, with the page's capability.
@@ -249,7 +267,7 @@ export function AdminShell() {
       <NoAccess
         title="This page is for tournament admins"
         body={`As ${role ? ROLE_LABEL[role].toLowerCase() : 'staff'}, you run match day: courts, scores and notifications. Ask an owner if you need more.`}
-        actions={<ButtonLink to={`/admin/t/${t.id}`}>Back to the dashboard</ButtonLink>}
+        actions={<ButtonLink to={`/admin/t/${t.id}`}>Back to the tournament</ButtonLink>}
       />
     );
 
@@ -291,6 +309,7 @@ export function AdminShell() {
               <IconButton label="Open menu" className="lg:hidden" onClick={() => setDrawer(true)}>
                 <Icon name="menu" size={22} />
               </IconButton>
+              {!isHomePath(pathname) && <BackButton />}
               <IconButton
                 label={collapsed ? 'Expand sidebar (Ctrl+\\)' : 'Collapse sidebar (Ctrl+\\)'}
                 className="hidden lg:inline-flex"
@@ -319,7 +338,7 @@ export function AdminShell() {
               </div>
             </div>
           </header>
-          <main className="pb-safe-bar mx-auto w-full max-w-[1320px] flex-1 px-4 pt-6 sm:px-6 lg:px-10 lg:pt-8">{page}</main>
+          <main className="pb-safe-bar mx-auto w-full max-w-[1320px] flex-1 px-3 pt-4 sm:px-5 lg:px-8 lg:pt-5">{page}</main>
         </div>
       </div>
       {t && role && (

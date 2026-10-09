@@ -3,6 +3,7 @@
 // Every structure is expressed as matches whose two slots point at a source
 // (an entry, a bye, the winner/loser of another match, or a group finishing position),
 // so one resolver (progression.ts) drives all of them.
+import { spreadClubs } from './clubSpread';
 import { arrangeBalanced, rankByLevel, separateGroups } from './pairing';
 import { mulberry32, shuffle } from './rng';
 import type { DrawPlan, Group, ID, Match, SlotSource, Stage, TEvent } from './types';
@@ -179,23 +180,42 @@ export interface DrawInput {
   nameOf?: (id: ID) => string;
   /** skill level as a number (A=4 … D=1); enables level-balanced pairing */
   levelOf?: (id: ID) => number;
+  /**
+   * First-round lines fixed by the organizer (editing a published draw): used as they are, with no
+   * placement, seeding or spreading. Only for knockout and drop flight.
+   */
+  lines?: (ID | 'BYE')[];
 }
 
-/** Seeds + byes + first-round pairs: level-balanced when levels are known, otherwise BWF draw by lot. */
-function place(input: DrawInput, rand: () => number): Placement {
-  const pairing = input.event.config.pairing ?? 'balanced';
-  if (pairing !== 'random' && input.levelOf) {
-    const a = arrangeBalanced({
-      entryIds: input.entryIds,
-      seeds: input.seeds,
-      levelOf: input.levelOf,
-      clubOf: input.clubOf,
-      pairing,
-      rand,
-    });
-    return { size: a.size, lines: a.lines, clubClashes: a.clubClashes };
+const clashesIn = (lines: (ID | 'BYE')[], clubOf: (id: ID) => string | undefined): [ID, ID][] => {
+  const out: [ID, ID][] = [];
+  for (let l = 0; l < lines.length; l += 2) {
+    const [a, b] = [lines[l], lines[l + 1]];
+    if (a !== 'BYE' && b !== 'BYE' && clubOf(a) && clubOf(a) === clubOf(b)) out.push([a, b]);
   }
-  return placeKnockout(input.entryIds.slice(0, input.seeds), input.entryIds.slice(input.seeds), rand, input.clubOf);
+  return out;
+};
+
+/**
+ * Seeds + byes + first-round pairs: level-balanced when levels are known, otherwise BWF draw by lot.
+ * Then clubmates are spread through the draw so they meet as late as possible (see clubSpread).
+ */
+function place(input: DrawInput, rand: () => number): Placement {
+  if (input.lines) return { size: input.lines.length, lines: input.lines, clubClashes: clashesIn(input.lines, input.clubOf) };
+  const pairing = input.event.config.pairing ?? 'balanced';
+  const levelOf = input.levelOf;
+  const balanced = pairing !== 'random' && !!levelOf;
+  const p: Placement = balanced
+    ? arrangeBalanced({ entryIds: input.entryIds, seeds: input.seeds, levelOf, clubOf: input.clubOf, pairing, rand })
+    : placeKnockout(input.entryIds.slice(0, input.seeds), input.entryIds.slice(input.seeds), rand, input.clubOf);
+  const lines = spreadClubs({
+    lines: p.lines,
+    seeded: new Set(input.entryIds.slice(0, input.seeds)),
+    clubOf: input.clubOf,
+    // level-balanced draws only trade players of the same level, so every match-up stays as drawn
+    sameStrength: balanced ? (a, b) => levelOf(a) === levelOf(b) : undefined,
+  });
+  return { size: p.size, lines, clubClashes: clashesIn(lines, input.clubOf) };
 }
 
 export function generateDraw(input: DrawInput): DrawPlan {
@@ -209,10 +229,10 @@ export function generateDraw(input: DrawInput): DrawPlan {
   }
 }
 
-function placementWarnings(p: Placement, nameOf?: (id: ID) => string): string[] {
+function placementWarnings(p: Placement, nameOf?: (id: ID) => string, clubOf?: (id: ID) => string | undefined): string[] {
   return p.clubClashes.map(
     ([a, b]) =>
-      `${nameOf?.(a) ?? a} and ${nameOf?.(b) ?? b} are from the same club and meet in round 1. There was no way to separate them.`,
+      `${nameOf?.(a) ?? a} and ${nameOf?.(b) ?? b} are both from ${clubOf?.(a) ?? 'the same club'} and meet in round 1. The draw couldn't keep them apart; shuffle again or move one of them after publishing.`,
   );
 }
 
@@ -223,7 +243,7 @@ function knockoutDraw(input: DrawInput): DrawPlan {
   const main = makeStage(event.id, 'main', 'Main draw', 0, p.size);
   const stages = [main];
   const matches = buildBracket(main, p.lines.map(lineSource));
-  const warnings = placementWarnings(p, nameOf);
+  const warnings = placementWarnings(p, nameOf, input.clubOf);
 
   if (event.config.plate) {
     const plate = feederBracket(event.id, 'plate', 'Plate', 1, undefined, roundOf(matches, 1), 'Plate');
@@ -281,7 +301,7 @@ function dropFlightDraw(input: DrawInput): DrawPlan {
   const rand = mulberry32(rngSeed);
   const p = place(input, rand);
   const S = p.size;
-  const warnings = placementWarnings(p, nameOf);
+  const warnings = placementWarnings(p, nameOf, input.clubOf);
 
   const A = makeStage(event.id, 'A', 'A flight', 0, S, 'A');
   const aMatches = buildBracket(A, p.lines.map(lineSource));

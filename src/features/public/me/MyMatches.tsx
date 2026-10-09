@@ -38,7 +38,7 @@ export function MyMatches() {
   const shownNotices = allNotices ? notices : notices.slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           <Avatar name={me?.name ?? user?.name ?? '?'} size={60} />
@@ -77,12 +77,12 @@ export function MyMatches() {
 
           {t.status === 'live' && <NextMatchHero lk={lk} t={t} playerId={me.id} />}
 
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="order-2 min-w-0 lg:order-1">
               <PlayerDetail t={t} lk={lk} p={me} header={false} />
             </div>
 
-            <aside className="order-1 flex min-w-0 flex-col gap-8 lg:order-2">
+            <aside className="order-1 flex min-w-0 flex-col gap-6 lg:order-2">
               <section aria-labelledby="desk-msgs">
                 <SectionHead
                   title={<span id="desk-msgs">Messages from the desk</span>}

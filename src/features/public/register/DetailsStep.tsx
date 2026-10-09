@@ -33,7 +33,7 @@ export function DetailsStep({ t, me, chosen, picked, setPicked, touched }: Props
   return (
     <section aria-labelledby="step-details" className="flex flex-col gap-4">
       <div>
-        <h2 id="step-details" className="mb-1 font-display text-[clamp(20px,2.4vw,24px)] font-extrabold">
+        <h2 id="step-details" className="mb-1 font-display text-[18px] font-extrabold sm:text-[20px]">
           Levels &amp; partners
         </h2>
         <p className="text-[14px] text-muted">

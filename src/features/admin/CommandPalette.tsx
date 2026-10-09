@@ -54,7 +54,7 @@ export function CommandPalette({
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-xl animate-rise overflow-hidden rounded-3xl border border-line bg-raised shadow-pop"
+        className="relative w-full max-w-xl animate-rise overflow-hidden rounded-2xl border border-line bg-raised shadow-pop"
         role="dialog"
         aria-modal="true"
         aria-label="Find a match"

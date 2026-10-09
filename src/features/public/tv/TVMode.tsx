@@ -45,7 +45,7 @@ export function TVMode() {
   const upNext = queue.slice(0, 8);
 
   return (
-    <div className="flex min-h-dvh flex-col gap-6 bg-bg px-4 py-4 text-fg sm:px-6 sm:py-6 3xl:gap-8 3xl:px-10 3xl:py-8 short:gap-4 short:py-3">
+    <div className="flex min-h-dvh flex-col gap-6 bg-bg px-4 py-4 text-fg sm:px-6 sm:py-6 3xl:gap-6 3xl:px-10 3xl:py-8 short:gap-4 short:py-3">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <Link
           to={`/t/${t.slug}/courts`}
@@ -85,7 +85,7 @@ export function TVMode() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col gap-8 3xl:gap-10">
+      <main className="flex flex-1 flex-col gap-6 3xl:gap-6">
         <section aria-label="Courts">
           {t.courts.length === 0 ? (
             <p className="text-[18px] text-muted">No courts set up yet.</p>

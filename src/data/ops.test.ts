@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { GameScore, Match, MatchUpdate, Side } from '@/engine/types';
 
-import { buildDemo } from '@/data/demo';
 import * as ops from '@/data/ops';
 import type { DB } from '@/data/types';
+
+import { buildSampleData as buildDemo } from '@/test/fixtures/sampleTournaments';
 
 const NOW = Date.UTC(2026, 9, 10, 15, 0);
 
@@ -127,6 +128,29 @@ describe('live scoring', () => {
     cur = ops.adjustLive(cur, m.id, 'a', 1, rules, NOW).db!;
     expect(get(cur, m.id).games).toEqual([[rules.pointsToWin, 0]]);
     expect(get(cur, m.id).live).toEqual([0, 0]);
+  });
+});
+
+describe('typed live scores', () => {
+  it("sets one side's points and rolls a finished game into the games list", () => {
+    const m = matchesOfLive().find((x) => x.status === 'on_court')!;
+    const rules = ops.rulesOfMatch(db, m);
+    let cur: DB = { ...db, matches: db.matches.map((x) => (x.id === m.id ? { ...x, games: [], live: [5, 7] } : x)) };
+    cur = ops.setLivePoints(cur, m.id, 'a', 9, rules, NOW).db!;
+    expect(get(cur, m.id).live).toEqual([9, 7]);
+    cur = ops.setLivePoints(cur, m.id, 'b', rules.pointsToWin, rules, NOW).db!;
+    expect(get(cur, m.id).games).toEqual([[9, rules.pointsToWin]]);
+    expect(get(cur, m.id).live).toEqual([0, 0]);
+  });
+
+  it('refuses impossible or out-of-range scores', () => {
+    const m = matchesOfLive().find((x) => x.status === 'on_court')!;
+    const rules = ops.rulesOfMatch(db, m);
+    const cur: DB = { ...db, matches: db.matches.map((x) => (x.id === m.id ? { ...x, games: [], live: [20, 0] } : x)) };
+    expect(ops.setLivePoints(cur, m.id, 'b', 99, rules, NOW).error).toMatch(/from 0 to/);
+    expect(ops.setLivePoints(cur, m.id, 'a', rules.cap, rules, NOW).error).toBeTruthy();
+    const ready = matchesOfLive().find((x) => x.status === 'ready')!;
+    expect(ops.setLivePoints(db, ready.id, 'a', 3, rules, NOW).error).toMatch(/on court/);
   });
 });
 

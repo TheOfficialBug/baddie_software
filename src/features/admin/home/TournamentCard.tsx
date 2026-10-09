@@ -21,6 +21,7 @@ export function StatusBadge({ t }: { t: Tournament }) {
       </Pill>
     );
   if (t.status === 'registration') return <Pill tone="ok">Registration open</Pill>;
+  if (t.status === 'closed') return <Pill tone="info">Registration closed</Pill>;
   if (t.status === 'completed') return <Pill tone="muted">Completed</Pill>;
   return <Pill tone="warn">Draft</Pill>;
 }
@@ -34,7 +35,7 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
     t.status === 'live' ? { k: 'On court', v: s.onCourt } : { k: 'Courts', v: t.courts.length },
   ];
   return (
-    <article className="panel panel-hover flex min-w-0 flex-col gap-5 p-5 sm:p-6">
+    <article className="panel panel-hover flex min-w-0 flex-col gap-5 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <StatusBadge t={t} />
         <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">

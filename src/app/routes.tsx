@@ -84,13 +84,10 @@ export const routes: RouteObject[] = [
               {
                 path: 't/:tid',
                 ...needs('run_match_day'),
-                lazy: () => import('@/features/admin/dashboard/Dashboard').then((m) => ({ Component: m.Dashboard })),
+                lazy: () => import('@/features/admin/run/RunTournament').then((m) => ({ Component: m.RunTournament })),
               },
-              {
-                path: 't/:tid/courts',
-                ...needs('run_match_day'),
-                lazy: () => import('@/features/admin/courts/ControlCenter').then((m) => ({ Component: m.ControlCenter })),
-              },
+              // the court board now lives on the tournament home (match day stage)
+              { path: 't/:tid/courts', loader: ({ params }) => redirect(`/admin/t/${params.tid}`), Component: () => null },
               {
                 path: 't/:tid/scores',
                 ...needs('run_match_day'),
@@ -135,6 +132,12 @@ export const routes: RouteObject[] = [
                 path: 't/:tid/settings',
                 ...needs('manage_settings'),
                 lazy: () => import('@/features/admin/settings/Settings').then((m) => ({ Component: m.Settings })),
+              },
+              {
+                // test runs on demo data (the nav only shows it in demo mode)
+                path: 't/:tid/simulate',
+                ...needs('manage_settings'),
+                lazy: () => import('@/features/admin/simulate/Simulator').then((m) => ({ Component: m.Simulator })),
               },
               { path: '*', element: <NotFound /> },
             ],

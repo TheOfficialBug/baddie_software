@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { rulesIdForMatch } from '@/engine/rules';
 import type { SlotSource } from '@/engine/types';
 
-import { buildDemo } from '@/data/demo';
+import { buildSampleData as buildDemo } from '@/test/fixtures/sampleTournaments';
 
 const MIGRATIONS = join(__dirname, '../../supabase/migrations');
 
@@ -601,6 +601,26 @@ describe('row level security', () => {
         (await db.query(`update events set fee_cents = fee_cents where tournament_id = $1`, [uuid('t-fall')])).affectedRows,
       ).toBeGreaterThan(0);
       expect(await count(`select count(*) n from player_private`)).toBeGreaterThan(0);
+    });
+  });
+
+  it('saved draw changes are for draw staff only: admins save them, scorers and the public never see them', async () => {
+    const ev = await db.query<{ id: string }>(
+      `select e.id from events e join tournaments t on t.id = e.tournament_id where t.id = $1 limit 1`,
+      [uuid('t-fall')],
+    );
+    const eventId = ev.rows[0].id;
+    await as('owner', async () => {
+      await db.query(`insert into draw_drafts (event_id, base, seating) values ($1, '{}', '{"m1:a": null}')`, [eventId]);
+      const saved = await db.query<{ saved_by: string }>(`select saved_by from draw_drafts where event_id = $1`, [eventId]);
+      expect(saved.rows[0].saved_by).toBe(users.owner);
+    });
+    await as('scorer', async () => {
+      expect(await count(`select count(*) n from draw_drafts`)).toBe(0);
+      await expect(db.query(`insert into draw_drafts (event_id, base, seating) values ($1, '{}', '{}')`, [eventId])).rejects.toThrow();
+    });
+    await as('anon', async () => {
+      expect(await count(`select count(*) n from draw_drafts`)).toBe(0);
     });
   });
 

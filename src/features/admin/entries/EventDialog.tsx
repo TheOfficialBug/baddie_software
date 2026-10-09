@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { RULES } from '@/engine/rules';
 import type { EventKind, Mode, RulesId, TEvent, Tournament } from '@/engine/types';
 
-import { KIND_LABEL } from '@/data/demo';
+import { KIND_LABEL } from '@/data/catalog';
 import { useStore } from '@/data/store';
 import { toast } from '@/data/toast';
 

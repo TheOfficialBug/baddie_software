@@ -49,7 +49,7 @@ erDiagram
   profiles ||--o{ follows : "follows players"
 ```
 
-## Tables (26)
+## Tables (28)
 
 | Area | Table | Purpose |
 |---|---|---|
@@ -59,7 +59,7 @@ erDiagram
 | | `clubs` | Case-insensitive unique names, used for same-club separation. |
 | | `players` | Public identity: name, gender, club, skill level A–D. Optionally claimed by a profile. |
 | | `player_private` | Email, phone, birth year. Readable only by the player and organizers they registered with. |
-| Tournament | `tournaments` | Slug, dates, venue, status `draft → registration → live → completed → archived`, default scoring (`rules_id` + `first_round_rules_id`), rest minutes, match-number counter. |
+| Tournament | `tournaments` | Slug, dates, venue, status `draft → registration → closed → live → completed → archived`, default scoring (`rules_id` + `first_round_rules_id`), rest minutes, match-number counter. |
 | | `courts` | Named courts with order and active flag. |
 | | `events` | MS/WS/MD/WD/XD with draw config as real columns: mode (round robin, drop flight, knockout), group size, advance, AB/ABCD, 3rd place, plate, seeds, pairing (balanced/classic/random), scoring override, entry cap, fee. |
 | Registration | `registrations` | Player × tournament, payment status. |
@@ -72,6 +72,7 @@ erDiagram
 | | `match_sources` | Where each side comes from: an entry, a bye, the winner/loser of another match, or rank N of a pool. This is the bracket graph. |
 | | `match_games` | Points per game. |
 | | `match_log` | Audit trail of every match change. |
+| | `draw_drafts` | Saved, unpublished edits to a published draw (starting places), one per event. Staff with draw rights only; players never see them. Cleared on publish, discard or reset. |
 | Comms | `notices`, `notice_recipients`, `notice_reads` | Court calls, announcements, delays; to everyone, one event, or chosen players; read receipts. |
 | | `notification_prefs`, `follows` | Per-user preferences and followed players. |
 
@@ -91,7 +92,7 @@ erDiagram
 | Status fields agree with each other (on court ⇒ court + called time; finished ⇒ winner + result + finish time; times in order) | Table `check` constraints |
 | Slugs, emails, phones, name lengths, dates (≤ 14-day event) | `check` constraints |
 
-## Who can do what (row level security on all 26 tables, 58 policies)
+## Who can do what (row level security on all 28 tables, 62 policies)
 
 | | Public (not signed in) | Player | Scorer | Admin / Owner |
 |---|---|---|---|---|
@@ -100,7 +101,7 @@ erDiagram
 | See contact details | | own | | ✓ registered players |
 | Register, invite a partner | | ✓ | | ✓ |
 | Call matches, live scores, enter results, send notices | | | ✓ | ✓ |
-| Create events, courts, draws; accept entries; seed | | | | ✓ |
+| Create events, courts, draws; accept entries; seed; save unpublished draw changes | | | | ✓ |
 | Read the audit log | | | ✓ | ✓ |
 | Manage staff | | | | owner |
 

@@ -22,7 +22,7 @@ export function SectionHead({
     <div className={cn('mb-4 flex flex-wrap items-end justify-between gap-3', className)}>
       <div className="min-w-0">
         {eyebrow && <div className="eyebrow mb-1">{eyebrow}</div>}
-        <H className="font-display text-[clamp(20px,2.4vw,24px)] font-extrabold leading-tight">{title}</H>
+        <H className="font-display text-[18px] font-extrabold leading-tight sm:text-[20px]">{title}</H>
         {description && <p className="mt-1 text-[14px] text-muted">{description}</p>}
       </div>
       {action}

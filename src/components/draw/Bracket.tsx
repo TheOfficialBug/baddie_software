@@ -1,22 +1,26 @@
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo } from 'react';
 
 import { roundName } from '@/engine/draws';
 import type { Match, Stage } from '@/engine/types';
 
+import { cn } from '@/lib/cn';
+
 import type { Lookup } from '@/data/lookup';
 
+import { DrawCanvas } from '@/components/draw/DrawCanvas';
 import { BracketMatch } from '@/components/match/Match';
 import { FlightBadge } from '@/components/tournament/Badges';
-import { FLIGHT_TEXT } from '@/components/tournament/labels';
 import { Icon } from '@/components/ui/Icon';
-import { Segmented } from '@/components/ui/Tabs';
 
-const SLOT = 92; // px per first-round match in the tree
+const SLOT = 68; // px per first-round match in the tree (two 28px rows + gap)
+
+/** Matches that never get played (a bye): left out of the tree; the player appears in the next round. */
+const hidden = (m: Match) => m.status === 'bye' || m.srcA.kind === 'bye' || m.srcB.kind === 'bye';
 
 /**
- * Knockout bracket.
- * Phones and small tablets: one round at a time with a round picker (no sideways scrolling).
- * Tablets landscape and up: the full tree with connector lines, scrolling inside its own card.
+ * Knockout bracket as a canvas (Challonge-style): every round side by side with connector lines,
+ * scrollable both ways on any screen, zoomable, round names pinned while scrolling down.
+ * With `editLine`, every first-round line (byes too) is drawn by the caller: the draw editor.
  */
 export function Bracket({
   lk,
@@ -25,6 +29,8 @@ export function Bracket({
   highlight,
   onOpen,
   title,
+  editLine,
+  toolbar,
 }: {
   lk: Lookup;
   stage: Stage;
@@ -32,6 +38,10 @@ export function Bracket({
   highlight?: string | null;
   onOpen?: (m: Match) => void;
   title?: boolean;
+  /** Draw the first-round lines yourself (placement editing); byes are shown so they can be filled. */
+  editLine?: (m: Match) => ReactNode;
+  /** Shown above the draw inside the canvas (and in full screen), e.g. the editor's actions. */
+  toolbar?: ReactNode;
 }) {
   const rounds = useMemo(() => {
     const out: Match[][] = [];
@@ -40,123 +50,114 @@ export function Bracket({
   }, [matches, stage.rounds]);
   const final = rounds[rounds.length - 1]?.[0];
   const champion = final && (final.status === 'finished' || final.status === 'bye') && final.winner ? final[final.winner] : null;
-  const [mobileRound, setMobileRound] = useState(() => {
-    const firstOpen = rounds.findIndex((r) => r.some((m) => m.status !== 'finished' && m.status !== 'bye'));
-    return String(firstOpen < 0 ? rounds.length - 1 : firstOpen);
-  });
   const h = Math.max(1, rounds[0]?.length ?? 1) * SLOT;
+  // while editing, round-1 byes are drawn too (their player can be moved)
+  const isHidden = (m: Match, round: number) => (editLine && round === 0 ? false : hidden(m));
+  const byes = editLine ? 0 : (rounds[0]?.filter(hidden).length ?? 0);
+  // Columns as wide as the longest name in this draw (doubles pairs too), so names show in full:
+  // ~6.5px a character at 12.5px, plus the number gutter, a seed tag and up to three game scores.
+  const longest = Math.max(12, ...matches.flatMap((m) => [m.a, m.b]).map((e) => (e && e !== 'BYE' ? lk.entryName(e).length : 14)));
+  const colWidth = Math.min(380, Math.max(180, Math.round(longest * 6.5 + 32 + 26 + 56)));
 
   return (
     <section className="min-w-0" aria-label={stage.name}>
       {title && (
-        <div className="mb-3 flex items-center gap-2.5">
+        <div className="mb-2 flex items-center gap-2">
           {stage.flight && <FlightBadge flight={stage.flight} />}
-          <h3 className="font-display text-[20px] font-bold">{stage.name}</h3>
-          <span className="text-[13px] text-muted">{stage.size}-draw</span>
+          <h3 className="font-display text-[17px] font-bold">{stage.name}</h3>
+          <span className="text-[12.5px] text-muted">{stage.size}-draw</span>
         </div>
       )}
 
       {champion && champion !== 'BYE' && (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-hero p-4 text-hero-fg">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg">
-            <Icon name="trophy" size={22} />
+        <div className="mb-2 flex items-center gap-2.5 rounded-xl bg-hero px-3 py-2 text-hero-fg">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-fg">
+            <Icon name="trophy" size={16} />
           </span>
-          <div className="min-w-0">
-            <div className="text-[12px] font-semibold uppercase tracking-wider text-hero-muted">
-              {stage.flight
-                ? `${stage.flight} flight champion`
-                : stage.name === '3rd place'
-                  ? 'Third place'
-                  : stage.name === 'Plate'
-                    ? 'Plate winner'
-                    : 'Champion'}
-            </div>
-            <div className="truncate font-display text-[20px] font-bold">{lk.entryName(champion)}</div>
-          </div>
+          <span className="text-[11.5px] font-semibold uppercase tracking-wider text-hero-muted">
+            {stage.flight
+              ? `${stage.flight} flight champion`
+              : stage.name === '3rd place'
+                ? 'Third place'
+                : stage.name === 'Plate'
+                  ? 'Plate winner'
+                  : 'Champion'}
+          </span>
+          <span className="min-w-0 truncate font-display text-[16px] font-bold">{lk.entryName(champion)}</span>
         </div>
       )}
 
-      {/* Phones / small tablets: one round at a time */}
-      <div className="lg:hidden">
-        {rounds.length > 1 && (
-          <Segmented
-            label="Round"
-            size="sm"
-            className="mb-3"
-            value={mobileRound}
-            onChange={setMobileRound}
-            options={rounds.map((ms, i) => ({
-              value: String(i),
-              label: roundName(stage, i + 1, true),
-              count: ms.filter((m) => m.status !== 'bye').length,
-            }))}
-          />
-        )}
-        <div className="grid gap-2.5 sm:grid-cols-2">
-          {(rounds[Number(mobileRound)] ?? [])
-            .filter((m) => m.status !== 'bye')
-            .map((m) => (
-              <BracketMatch key={m.id} lk={lk} m={m} highlight={highlight} onOpen={onOpen} />
-            ))}
-        </div>
-        {(() => {
-          const byes = (rounds[Number(mobileRound)] ?? []).filter((m) => m.status === 'bye').length;
-          return byes ? (
-            <p className="mt-3 text-[13px] text-muted">
-              {byes} {byes === 1 ? 'player has' : 'players have'} a bye this round and go straight through.
-            </p>
-          ) : null;
-        })()}
-      </div>
-
-      {/* Laptop and up: the full tree */}
-      <div className="panel scroll-thin hidden overflow-x-auto p-5 lg:block">
-        <div className="flex min-w-max gap-7 pr-2">
+      <DrawCanvas label={`${stage.name} bracket`} toolbar={toolbar}>
+        <div className="flex gap-5 pr-2">
           {rounds.map((ms, ri) => {
             const pairs: Match[][] = [];
             for (let i = 0; i < ms.length; i += 2) pairs.push(ms.slice(i, i + 2));
             const last = ri === rounds.length - 1;
             const done = ms.filter((m) => m.status === 'finished').length;
-            const real = ms.filter((m) => m.status !== 'bye').length;
+            const real = ms.filter((m) => !hidden(m)).length;
             return (
-              <div key={ri} className="flex w-[220px] shrink-0 flex-col">
-                <div className="mb-3 flex h-5 items-baseline justify-between">
+              <div key={ri} className="flex shrink-0 flex-col" style={{ width: colWidth }}>
+                <div className="sticky top-0 z-[1] -mt-10 mb-2 flex h-8 items-center justify-between rounded-md bg-surface/95 px-1 backdrop-blur">
                   <span className="eyebrow text-fg">{roundName(stage, ri + 1)}</span>
                   <span className="num text-[11px] text-muted">
                     {done}/{real}
                   </span>
                 </div>
                 <div className="flex flex-col" style={{ height: h }}>
-                  {pairs.map((pair, pi) => (
-                    <div key={pi} className="relative flex flex-1 flex-col">
-                      {pair.map((m) => (
-                        <div key={m.id} className="relative flex flex-1 items-center py-1">
-                          {ri > 0 && <span className="absolute -left-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
-                          {!last && <span className="absolute -right-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
-                          <BracketMatch lk={lk} m={m} highlight={highlight} onOpen={onOpen} />
-                        </div>
-                      ))}
-                      {!last && pair.length === 2 && <span className="absolute -right-3.5 bottom-1/4 top-1/4 w-px bg-line-strong" />}
-                    </div>
-                  ))}
+                  {pairs.map((pair, pi) => {
+                    const [top, bottom] = pair.map((m) => !isHidden(m, ri));
+                    // vertical joiner between the pair's two stubs (only from matches that are drawn)
+                    const bar =
+                      pair.length === 2 && (top || bottom)
+                        ? top && bottom
+                          ? 'top-1/4 bottom-1/4'
+                          : top
+                            ? 'top-1/4 bottom-1/2'
+                            : 'top-1/2 bottom-1/4'
+                        : null;
+                    return (
+                      <div key={pi} className="relative flex flex-1 flex-col">
+                        {pair.map((m) => (
+                          <div key={m.id} className="relative flex flex-1 items-center py-1">
+                            {isHidden(m, ri) ? null : (
+                              <>
+                                {ri > 0 && <span className="absolute -left-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
+                                {!last && <span className="absolute -right-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
+                                {editLine && ri === 0 ? editLine(m) : <BracketMatch lk={lk} m={m} highlight={highlight} onOpen={onOpen} />}
+                              </>
+                            )}
+                          </div>
+                        ))}
+                        {!last && bar && <span className={cn('absolute -right-3.5 w-px bg-line-strong', bar)} />}
+                        {/* a round-1 pair of byes still feeds the next round */}
+                        {!last && ri === 0 && !top && !bottom && <span className="absolute -right-3.5 top-1/2 h-px w-3.5 bg-line" />}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
           {champion && champion !== 'BYE' && (
-            <div className="flex w-[180px] shrink-0 flex-col">
-              <div className="eyebrow mb-3 h-5 text-fg">Winner</div>
+            <div className="flex w-[170px] shrink-0 flex-col">
+              <div className="sticky top-0 z-[1] -mt-10 mb-2 flex h-8 items-center px-1">
+                <span className="eyebrow text-fg">Winner</span>
+              </div>
               <div className="flex items-center" style={{ height: h }}>
-                <div className="flex w-full items-center gap-2 rounded-xl bg-primary px-3 py-3 font-semibold text-primary-fg">
-                  <Icon name="trophy" size={18} />
+                <div className="flex w-full items-center gap-2 rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-semibold text-primary-fg">
+                  <Icon name="trophy" size={15} />
                   <span className="truncate">{lk.entryName(champion)}</span>
                 </div>
               </div>
             </div>
           )}
         </div>
-      </div>
-      <span className="hidden">{stage.flight ? FLIGHT_TEXT[stage.flight] : ''}</span>
+      </DrawCanvas>
+      {byes > 0 && (
+        <p className="mt-1.5 text-[12.5px] text-muted">
+          {byes} {byes === 1 ? 'player has a first-round bye and starts' : 'players have first-round byes and start'} in round 2.
+        </p>
+      )}
     </section>
   );
 }
