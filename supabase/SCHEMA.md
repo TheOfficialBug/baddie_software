@@ -73,6 +73,7 @@ erDiagram
 | | `match_games` | Points per game. |
 | | `match_log` | Audit trail of every match change. |
 | | `draw_drafts` | Saved, unpublished edits to a published draw (starting places), one per event. Staff with draw rights only; players never see them. Cleared on publish, discard or reset. |
+| | `check_ins` | Players who have arrived at the venue, one per player per tournament, with who checked them in. Match-day staff (owner, admin, scorer) only; cleared to start check-in for a new day. |
 | Comms | `notices`, `notice_recipients`, `notice_reads` | Court calls, announcements, delays; to everyone, one event, or chosen players; read receipts. |
 | | `notification_prefs`, `follows` | Per-user preferences and followed players. |
 
@@ -132,7 +133,7 @@ Errors are short codes (`player_busy`, `player_resting`, `match_not_ready`, `sta
 Run locally against real Postgres 18 compiled to WebAssembly (PGlite), with a stub of Supabase's `auth` schema and roles:
 
 - `node scripts/check-migration.mjs`: migration applies cleanly. 26 tables · 58 policies · 26 functions.
-- `supabase/tests/schema.test.ts`: **19/19 pass.** Imports the full demo (3 tournaments, every event, draws, results, notices), then checks:
+- `supabase/tests/schema.test.ts`: **20/20 pass.** Imports the full demo (3 tournaments, every event, draws, results, notices), then checks:
   - row counts match the demo, owner membership and profiles are created by triggers
   - round 1 uses `ONE_30`, later rounds `BWF_3x21`
   - a second match on a busy court is rejected; a busy player is rejected; rest time is enforced and can be overridden

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useRef, useState } from 'react';
 
 import type { Court, Match, Tournament } from '@/engine/types';
 
@@ -7,10 +7,12 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 import { fmtTime } from '@/lib/format';
 
+import { fillFreeCourts } from '@/data/assign';
+import { notCheckedIn } from '@/data/checkIns';
 import type { Lookup } from '@/data/lookup';
 import type { CallConflict } from '@/data/ops';
-import { useQueue, waitingFor } from '@/data/queries';
-import { useStore } from '@/data/store';
+import { useCheckInMarks, useQueue, waitingFor } from '@/data/queries';
+import { selectDB, useStore } from '@/data/store';
 import { toast } from '@/data/toast';
 
 import { averageDuration } from '@/components/match/matchTiming';
@@ -19,6 +21,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Segmented } from '@/components/ui/Tabs';
+import { useConfirm } from '@/components/ui/useConfirm';
 
 import { useAdmin } from '@/features/admin/adminContext';
 import { ConflictDialog } from '@/features/admin/courts/ConflictDialog';
@@ -34,6 +37,11 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
   const queue = useQueue(lk, t, now);
   const callMatch = useStore((s) => s.callMatch);
   const fillCourts = useStore((s) => s.fillCourts);
+  const entries = useStore((s) => s.entries);
+  const marks = useCheckInMarks(t);
+  const { ask, dialog } = useConfirm();
+  // matches the desk already chose to send although players hadn't checked in (don't ask twice)
+  const sendAnyway = useRef(new Set<string>());
   const { openScore } = useAdmin();
   // remembered per tournament, so switching pages or tabs keeps the desk where it was
   const [tab, setTab] = usePersistentState<'ready' | 'waiting' | 'recent'>(`courts.tab:${t.id}`, 'ready');
@@ -65,7 +73,28 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
   const avg = averageDuration(matches) ?? 32 * 60000;
   const finishAt = now + Math.ceil(left / Math.max(1, t.courts.length)) * (avg + 4 * 60000);
 
+  /** Names of a match's players who haven't checked in (none when check-in isn't in use). */
+  const absentNames = (m: Pick<Match, 'a' | 'b'>) =>
+    marks ? notCheckedIn(m, new Map(entries.map((e) => [e.id, e])), marks).map((p) => lk.player(p)?.name ?? 'A player') : [];
+  const listNames = (names: string[]) =>
+    names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
   const call = (matchId: string, courtId: string, force?: { busy?: boolean; rest?: boolean }) => {
+    const m = lk.match(matchId);
+    const absent = m && !sendAnyway.current.has(matchId) ? absentNames(m) : [];
+    if (m && absent.length) {
+      setPicking(null);
+      ask({
+        title: absent.length === 1 ? 'Player not checked in' : 'Players not checked in',
+        body: `${listNames(absent)} ${absent.length === 1 ? "hasn't" : "haven't"} checked in yet. Make sure they're at the venue before sending match #${m.number} to ${lk.courtName(t.id, courtId)}.`,
+        confirmLabel: 'Send anyway',
+        onConfirm: () => {
+          sendAnyway.current.add(matchId);
+          call(matchId, courtId, force);
+        },
+      });
+      return;
+    }
     const conflict = callMatch(matchId, courtId, force);
     setPicking(null);
     if (!conflict) {
@@ -77,7 +106,32 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
     } else if (conflict.busy.length || conflict.resting.length) setBlocked({ matchId, courtId, conflict });
   };
 
-  const fill = () => {
+  const fill = (checked = false) => {
+    if (marks && !checked) {
+      // what "Fill free courts" would send, to warn about players who haven't checked in
+      const { called } = fillFreeCourts(selectDB(useStore.getState()), t.id, Date.now());
+      const absent = called
+        .map((c) => ({ m: lk.match(c.matchId)!, names: absentNames(lk.match(c.matchId)!) }))
+        .filter((x) => x.names.length);
+      if (absent.length) {
+        ask({
+          title: "Some players haven't checked in",
+          body: `${absent.length} of the ${called.length} matches about to be sent ${absent.length === 1 ? 'has' : 'have'} players who haven't checked in yet.`,
+          warning: (
+            <ul className="flex flex-col gap-0.5">
+              {absent.map((x) => (
+                <li key={x.m.id}>
+                  <span className="num font-semibold">#{x.m.number}</span>: {listNames(x.names)}
+                </li>
+              ))}
+            </ul>
+          ),
+          confirmLabel: 'Fill anyway',
+          onConfirm: () => fill(true),
+        });
+        return;
+      }
+    }
     const n = fillCourts(t.id);
     if (n) toast(`${n} match${n === 1 ? '' : 'es'} sent to court`, { detail: 'Players were notified.' });
     else toast('Nobody is free to play yet', { tone: 'info', detail: 'Ready matches are waiting on busy or resting players.' });
@@ -146,7 +200,7 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
               className="w-full sm:w-auto"
               icon={<Icon name="whistle" size={18} />}
               disabled={!free.length || !callable.length}
-              onClick={fill}
+              onClick={() => fill()}
             >
               {fillLabel}
             </Button>
@@ -272,6 +326,7 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
         </aside>
       </div>
 
+      {dialog}
       <ConflictDialog lk={lk} t={t} state={blocked} queue={queue} now={now} onClose={() => setBlocked(null)} onCall={call} />
 
       <Dialog

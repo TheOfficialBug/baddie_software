@@ -6,10 +6,12 @@ import type { Match, Tournament } from '@/engine/types';
 import { fmtAgo } from '@/lib/format';
 
 import { type Lookup } from '@/data/lookup';
+import { useCheckInMarks } from '@/data/queries';
 import { useStore } from '@/data/store';
 
 import { matchContext } from '@/components/match/matchInfo';
 import { EventChip, FlightBadge, Pill } from '@/components/tournament/Badges';
+import { EntryNames } from '@/components/tournament/CheckInName';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 
@@ -17,6 +19,7 @@ import { useAdmin } from '@/features/admin/adminContext';
 
 export function MiniRow({ lk, m, sub, right }: { lk: Lookup; m: Match; sub?: string; right?: ReactNode }) {
   const c = matchContext(lk, m);
+  const marks = useCheckInMarks(lk.tournament(c.ev.tournamentId));
   return (
     <div className="flex items-start gap-3 rounded-2xl px-3 py-3 hover:bg-sunken">
       <span className="num w-10 shrink-0 pt-0.5 text-[15px] font-semibold text-muted">#{m.number}</span>
@@ -26,8 +29,15 @@ export function MiniRow({ lk, m, sub, right }: { lk: Lookup; m: Match; sub?: str
           {c.flight && <FlightBadge flight={c.flight} size="sm" />}
           <span className="truncate">{c.short}</span>
         </div>
-        <div className="truncate text-[14px] font-semibold">{m.a && m.a !== 'BYE' ? lk.entryName(m.a) : 'To be decided'}</div>
-        <div className="truncate text-[14px] font-semibold">{m.b && m.b !== 'BYE' ? lk.entryName(m.b) : 'To be decided'}</div>
+        {[m.a, m.b].map((e, i) =>
+          e && e !== 'BYE' ? (
+            <EntryNames key={i} lk={lk} entry={e} checkIns={marks} className="text-[14px] font-semibold" />
+          ) : (
+            <div key={i} className="truncate text-[14px] font-semibold">
+              To be decided
+            </div>
+          ),
+        )}
         {sub && <div className="mt-0.5 text-[12.5px] text-muted">{sub}</div>}
       </div>
       {right}
@@ -53,6 +63,7 @@ export function QueueRow({
   const { openScore } = useAdmin();
   const m = q.match;
   const c = matchContext(lk, m);
+  const marks = useCheckInMarks(t);
   return (
     <div
       draggable
@@ -73,8 +84,8 @@ export function QueueRow({
             {c.flight && <FlightBadge flight={c.flight} size="sm" />}
             <span className="truncate">{c.short}</span>
           </div>
-          <div className="truncate text-[14px] font-semibold">{lk.entryName(m.a)}</div>
-          <div className="truncate text-[14px] font-semibold">{lk.entryName(m.b)}</div>
+          <EntryNames lk={lk} entry={m.a} checkIns={marks} className="text-[14px] font-semibold" />
+          <EntryNames lk={lk} entry={m.b} checkIns={marks} className="text-[14px] font-semibold" />
           {q.blocked && (
             <div className="mt-1 flex items-center gap-1 text-[12.5px] font-medium text-live">
               <Icon name="alert" size={14} /> Unavailable: {q.blocked}

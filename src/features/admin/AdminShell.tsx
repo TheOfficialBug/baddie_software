@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import { safeStorage } from '@/lib/storage';
 
 import { useLookup } from '@/data/lookup';
+import { useCheckIns } from '@/data/queries';
 import { toast } from '@/data/toast';
 
 import { authActions, useAuth } from '@/auth/authStore';
@@ -40,6 +41,7 @@ export function AdminShell() {
   const tid = m?.params.tid;
   const t = lk.tournament(tid);
   const role = t ? access.roleIn(t.organizationId) : null;
+  const checkIns = useCheckIns(t?.id);
   const needed = (useMatches().at(-1)?.handle as RouteHandle | undefined)?.cap;
   const [scoreFor, setScoreFor] = useState<string | null>(null);
   const [drawer, setDrawer] = useState(false);
@@ -82,6 +84,17 @@ export function AdminShell() {
   const matches = t ? lk.matchesOf(t.id) : [];
   const onCourt = matches.filter((x) => x.status === 'on_court').length;
   const pendingEntries = t ? lk.eventsOf(t.id).reduce((n, e) => n + lk.entriesOf(e.id).filter((x) => x.status === 'pending').length, 0) : 0;
+  // on match day: players still to check in (shown on Players)
+  const checkInsLeft =
+    t?.status === 'live'
+      ? new Set(
+          lk
+            .eventsOf(t.id)
+            .flatMap((e) => lk.entriesOf(e.id).filter((x) => x.status === 'accepted'))
+            .flatMap((x) => x.playerIds)
+            .filter((p) => !checkIns.has(p)),
+        ).size
+      : 0;
 
   const allGroups: { title: string; items: NavItem[] }[] = t
     ? [
@@ -101,7 +114,7 @@ export function AdminShell() {
               cap: 'manage_entries',
             },
             { to: `/admin/t/${t.id}/draws`, label: 'Draws', icon: 'draws', cap: 'manage_draws' },
-            { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
+            { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users', badge: checkInsLeft || undefined },
             { to: `/admin/t/${t.id}/notify`, label: 'Messages', icon: 'megaphone' },
           ],
         },

@@ -5,6 +5,7 @@ import { readyQueue } from '@/engine/scheduler';
 import { computeStandings } from '@/engine/standings';
 import type { FlightLabel, Match, Player, TEvent, Tournament } from '@/engine/types';
 
+import { checkInsOf } from '@/data/checkIns';
 import type { Lookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
 
@@ -15,6 +16,18 @@ export function useQueue(lk: Lookup, t: Tournament, now: number) {
     const map = new Map(entries.map((e) => [e.id, e]));
     return readyQueue(lk.matchesOf(t.id), map, (p) => lk.player(p)?.name ?? '', t.courts, now, t.restMinutes);
   }, [lk, t, entries, now]);
+}
+
+/** Who has checked in at the venue: player id → check-in. */
+export function useCheckIns(tid: string | undefined) {
+  const all = useStore((s) => s.checkIns);
+  return useMemo(() => checkInsOf(all, tid ?? ''), [all, tid]);
+}
+
+/** Check-ins to show on players' names: from the time entries close (match day is near), otherwise none. */
+export function useCheckInMarks(t: Tournament | undefined) {
+  const checkIns = useCheckIns(t?.id);
+  return t && (t.status === 'closed' || t.status === 'live') ? checkIns : undefined;
 }
 
 /** Everyone entered in a tournament (withdrawn entries excluded), sorted by name. */

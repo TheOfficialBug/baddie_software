@@ -12,6 +12,7 @@ import { safeStorage } from '@/lib/storage';
 
 import * as accounts from '@/data/accounts';
 import { fillFreeCourts } from '@/data/assign';
+import * as checkIns from '@/data/checkIns';
 import * as ops from '@/data/ops';
 import { rearrangeDraw, type Seating } from '@/data/placements';
 import * as resets from '@/data/resets';
@@ -69,6 +70,11 @@ interface Actions {
   // tournament stage
   /** Move the tournament along: registration → closed → live → completed (or back). Players get an announcement. */
   setStage: (tid: ID, status: Tournament['status']) => void;
+  // check-in
+  /** Check players in at the venue, or undo it. `by` is the staff account doing it. */
+  setCheckedIn: (tid: ID, playerIds: ID[], on: boolean, by?: ID) => void;
+  /** Everyone in the tournament back to not checked in (start of a new day). */
+  clearCheckIns: (tid: ID) => void;
   // simulator (test runs)
   /** One step of match day: a result comes in and free courts are filled. */
   simulateTick: (tid: ID) => sim.TickResult;
@@ -284,6 +290,9 @@ export const useStore = create<State>()(
               : s.notices,
           }));
         },
+
+        setCheckedIn: (tid, playerIds, on, by) => commit(checkIns.setCheckedIn(db(), tid, playerIds, on, Date.now(), by)),
+        clearCheckIns: (tid) => commit(checkIns.clearCheckIns(db(), tid)),
 
         simulateTick: (tid) => {
           const r = sim.simulateTick(db(), tid, Date.now(), mulberry32(Date.now() % 2_147_483_647));

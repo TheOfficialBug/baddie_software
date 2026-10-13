@@ -57,6 +57,7 @@ beforeAll(async () => {
     `${adm}/draws`,
     `${adm}/draws/${ev.id}`,
     `${adm}/slips`,
+
     `${adm}/notify`,
     `${adm}/players`,
     `${adm}/settings`,

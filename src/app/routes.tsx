@@ -98,6 +98,8 @@ export const routes: RouteObject[] = [
                 ...needs('run_match_day'),
                 lazy: () => import('@/features/admin/scores/Scores').then((m) => ({ Component: m.Scores })),
               },
+              // check-in lives on the Players page
+              { path: 't/:tid/check-in', loader: ({ params }) => redirect(`/admin/t/${params.tid}/players`), Component: () => null },
               {
                 path: 't/:tid/players',
                 ...needs('run_match_day'),

@@ -79,6 +79,15 @@ export interface DrawDraft {
   savedBy?: ID;
 }
 
+/** A player who has arrived at the venue (checked in at the desk). One per player per tournament. */
+export interface CheckIn {
+  tournamentId: ID;
+  playerId: ID;
+  at: number;
+  /** Staff account that checked them in. */
+  by?: ID;
+}
+
 export interface DB {
   version: number;
   tournaments: Tournament[];
@@ -96,6 +105,7 @@ export interface DB {
   members: Membership[];
   orgInvites: OrgInvite[];
   drawDrafts: DrawDraft[];
+  checkIns: CheckIn[];
 }
 
 export const emptyDB = (): DB => ({
@@ -115,4 +125,5 @@ export const emptyDB = (): DB => ({
   members: [],
   orgInvites: [],
   drawDrafts: [],
+  checkIns: [],
 });

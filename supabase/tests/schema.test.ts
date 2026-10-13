@@ -624,6 +624,36 @@ describe('row level security', () => {
     });
   });
 
+  it('match-day staff check players in; players, strangers and the public never see check-ins', async () => {
+    const player = await one<{ id: string }>(
+      `select distinct ep.player_id id from entry_players ep join entries e on e.id = ep.entry_id join events ev on ev.id = e.event_id where ev.tournament_id = $1 limit 1`,
+      [uuid('t-fall')],
+    );
+    await as('scorer', async () => {
+      await db.query(`insert into check_ins (tournament_id, player_id) values ($1, $2)`, [uuid('t-fall'), player.id]);
+      const row = await one<{ checked_in_by: string }>(`select checked_in_by from check_ins where player_id = $1`, [player.id]);
+      expect(row.checked_in_by).toBe(users.scorer);
+      // one check-in per player per tournament
+      await rejects(
+        () => db.query(`insert into check_ins (tournament_id, player_id) values ($1, $2)`, [uuid('t-fall'), player.id]),
+        /duplicate key/,
+      );
+    });
+    for (const who of ['player', 'outsider'] as const) {
+      await as(who, async () => {
+        expect(await count(`select count(*) n from check_ins`), who).toBe(0);
+        expect((await db.query(`delete from check_ins`)).affectedRows ?? 0, who).toBe(0);
+      });
+    }
+    await as('anon', async () => {
+      expect(await count(`select count(*) n from check_ins`)).toBe(0);
+      await rejects(() => db.query(`delete from check_ins`), /permission denied/);
+    });
+    await as('owner', async () => {
+      expect((await db.query(`delete from check_ins where tournament_id = $1`, [uuid('t-fall')])).affectedRows).toBe(1);
+    });
+  });
+
   it('a player sees their own private details and their own notifications only', async () => {
     await as('player', async () => {
       expect(await count(`select count(*) n from player_private`)).toBe(1);
