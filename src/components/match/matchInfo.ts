@@ -26,6 +26,11 @@ export function slotPlaceholder(lk: Lookup, m: Match, side: Side): string {
   if (src.kind === 'winner' || src.kind === 'loser') {
     const from = lk.match(src.matchId);
     if (from?.number) return `${src.kind === 'winner' ? 'Winner' : 'Loser'} of #${from.number}`;
+    // the winner of a bye "match" is whoever is on its real side: describe that side instead
+    if (from && src.kind === 'winner') {
+      const realSide: Side | null = from.srcB.kind === 'bye' ? 'a' : from.srcA.kind === 'bye' ? 'b' : null;
+      if (realSide) return sideName(lk, from, realSide);
+    }
     return 'To be decided';
   }
   if (src.kind === 'group') return `${lk.group(src.groupId)?.name ?? 'Group'} ${src.rank === 1 ? 'winner' : 'runner-up'}`;

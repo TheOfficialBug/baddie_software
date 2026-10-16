@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { bwfSeedCount, nextPow2 } from './draws';
-import { arrangeBalanced, type Arrangement, LEVEL_VALUE, rankByLevel, separateGroups } from './pairing';
+import { arrangeBalanced, type Arrangement, chooseByes, LEVEL_VALUE, rankByLevel, separateGroups } from './pairing';
 import { mulberry32 } from './rng';
 import type { ID } from './types';
 
@@ -47,7 +47,7 @@ const levelPair = (f: Field, [x, y]: [ID, ID]) => [f.level[x], f.level[y]].sort(
 
 describe('arrangeBalanced', () => {
   describe.each(range(2, 64))('N=%i', (N) => {
-    it.each(['balanced', 'classic'] as const)('%s: valid draw, byes to the top of the ranking, seeds 1/2 apart', (pairing) => {
+    it.each(['balanced', 'classic'] as const)('%s: valid draw, byes to seeds and the top of the ranking, seeds 1/2 apart', (pairing) => {
       for (const s of [1, 2, 3, 4]) {
         const rand = mulberry32(N * 31 + s);
         const f = randomField(N, rand);
@@ -67,7 +67,8 @@ describe('arrangeBalanced', () => {
           .filter(([x, y]) => x === 'BYE' || y === 'BYE')
           .map(([x, y]) => (x === 'BYE' ? y : x));
         expect(byeHolders).not.toContain('BYE'); // no BYE vs BYE
-        expect([...byeHolders].sort()).toEqual(a.ranking.slice(0, byes).sort());
+        expect([...byeHolders].sort()).toEqual(chooseByes(a.ranking, seeds, byes, f.levelOf, f.clubOf).byeHolders.sort());
+        expect(byeHolders).toEqual(expect.arrayContaining(a.ranking.slice(0, Math.min(seeds, byes))));
 
         if (S >= 4) {
           const half = (id: ID) => (a.lines.indexOf(id) < S / 2 ? 'top' : 'bottom');
@@ -199,8 +200,7 @@ describe('arrangeBalanced club separation', () => {
     Math.max(...ids.reduce((m, id) => m.set(f.club[id], (m.get(f.club[id]) ?? 0) + 1), new Map<string, number>()).values());
 
   it.each(['balanced', 'classic'] as const)('%s: random fields (N=4..64) — clean whenever separation is possible', (pairing) => {
-    // Byes go to the top of the ranking, so separation is possible iff no club holds more than half of the
-    // entries that actually play round 1. Over all such fields there must be no clash; over the rest,
+    // Separation is possible iff no club holds more than half of the entries that actually play round 1. Over all such fields there must be no clash; over the rest,
     // every reported clash must be genuine and at least the unavoidable number of clashes is reported.
     let feasible = 0;
     let clean = 0;
@@ -209,7 +209,7 @@ describe('arrangeBalanced club separation', () => {
         const rand = mulberry32(N * 1000 + s);
         const f = randomField(N, rand);
         const a = arrangeBalanced({ entryIds: f.ids, seeds: bwfSeedCount(N), levelOf: f.levelOf, clubOf: f.clubOf, pairing, rand });
-        const players = a.ranking.slice(a.size - N);
+        const players = chooseByes(a.ranking, bwfSeedCount(N), a.size - N, f.levelOf, f.clubOf).players;
         const big = biggestClub(f, players);
         for (const [x, y] of a.clubClashes) expect(f.club[x]).toBe(f.club[y]);
         if (big <= players.length / 2) {
@@ -337,5 +337,39 @@ describe('separateGroups', () => {
       ['x2', 'y2', 'z2'],
     ];
     expect(separateGroups(groups, clubOf)).toEqual(groups);
+  });
+});
+
+describe('chooseByes', () => {
+  const lv = (levels: Record<ID, number>) => (id: ID) => levels[id];
+
+  it('keeps byes at the top of the ranking when round 1 is already mixed', () => {
+    const ranking = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const levelOf = lv({ a: 4, b: 4, c: 3, d: 3, e: 2, f: 1 });
+    expect(chooseByes(ranking, 1, 2, levelOf)).toEqual({ byeHolders: ['a', 'b'], players: ['c', 'd', 'e', 'f'] });
+  });
+
+  it('swaps the lowest unseeded bye-holders in when round 1 would be all one level', () => {
+    // like 35 pairs in a 64-draw: the 6 left to play are all D
+    const ids = Array.from({ length: 10 }, (_, i) => `e${i + 1}`);
+    const level: Record<ID, number> = Object.fromEntries(ids.map((id, i) => [id, i < 4 ? 3 : i < 6 ? 2 : 1]));
+    const { byeHolders, players } = chooseByes(ids, 2, 6, lv(level));
+    expect(byeHolders).toEqual(['e1', 'e2', 'e3', 'e4', 'e7', 'e8']);
+    expect(players).toEqual(['e5', 'e6', 'e9', 'e10']);
+    // so no D meets a D in round 1
+    const a = arrangeBalanced({
+      entryIds: ids,
+      seeds: 2,
+      levelOf: lv(level),
+      clubOf: () => undefined,
+      pairing: 'balanced',
+      rand: mulberry32(1),
+    });
+    expect(realPairs(a).map(([x, y]) => [level[x], level[y]].sort().join('v'))).toEqual(['1v2', '1v2']);
+  });
+
+  it('never takes a bye from a seed', () => {
+    const levelOf = lv({ a: 1, b: 1, c: 1, d: 1 });
+    expect(chooseByes(['a', 'b', 'c', 'd'], 2, 2, levelOf).byeHolders).toEqual(['a', 'b']);
   });
 });

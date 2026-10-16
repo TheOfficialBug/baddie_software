@@ -13,6 +13,7 @@ import { safeStorage } from '@/lib/storage';
 import * as accounts from '@/data/accounts';
 import { fillFreeCourts } from '@/data/assign';
 import * as checkIns from '@/data/checkIns';
+import { applyImport, type EntryList, type ImportPlan, planImport } from '@/data/entryList';
 import * as ops from '@/data/ops';
 import { rearrangeDraw, type Seating } from '@/data/placements';
 import * as resets from '@/data/resets';
@@ -55,6 +56,8 @@ interface Actions {
   setEntryLevel: (entryId: ID, slot: number, level: SkillLevel) => void;
   /** A player enters one or more events; each pick carries the levels and partner given for that event. */
   register: (tid: ID, playerId: ID, picks: RegistrationPick[], total: number) => void;
+  /** Replace the tournament's entries with an imported entry list. Returns what was done (or why not). */
+  importEntryList: (tid: ID, list: EntryList) => ImportPlan;
   // draws
   publishDraw: (eventId: ID, plan: DrawPlan, rngSeed: number, seedOrder: ID[]) => void;
   clearDraw: (eventId: ID) => void;
@@ -222,6 +225,11 @@ export const useStore = create<State>()(
           set((s) => ({
             registrations: [...s.registrations, { id: ops.uid('r'), tournamentId: tid, playerId, entryIds: ids, total, at: Date.now() }],
           }));
+        },
+        importEntryList: (tid, list) => {
+          const plan = planImport(db(), tid, list);
+          if (!plan.blocked) commit(applyImport(db(), tid, plan));
+          return plan;
         },
 
         publishDraw: (eventId, plan, rngSeed, seedOrder) => {

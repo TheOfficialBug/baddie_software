@@ -6,7 +6,7 @@
 import { spreadClubs } from './clubSpread';
 import { arrangeBalanced, rankByLevel, separateGroups } from './pairing';
 import { mulberry32, shuffle } from './rng';
-import type { DrawPlan, Group, ID, Match, SlotSource, Stage, TEvent } from './types';
+import type { DrawPlan, FlightLabel, Group, ID, Match, SlotSource, Stage, TEvent } from './types';
 
 export const nextPow2 = (n: number) => {
   let s = 2;
@@ -297,6 +297,7 @@ function feederBracket(eventId: ID, key: string, name: string, order: number, fl
  * guaranteed 3 matches (ABCD) or 2 (AB). A player with a bye in A has one fewer guaranteed match.
  */
 function dropFlightDraw(input: DrawInput): DrawPlan {
+  if (input.event.config.variant === 'PLACEMENT') return placementDraw(input);
   const { event, entryIds, rngSeed, nameOf } = input;
   const rand = mulberry32(rngSeed);
   const p = place(input, rand);
@@ -335,6 +336,204 @@ function dropFlightDraw(input: DrawInput): DrawPlan {
       matches.push(...D.matches);
     } else warnings.push('Too many byes for a D flight: fewer than 2 players can lose in C round 1.');
   }
+  return { stages, groups: [], matches, warnings };
+}
+
+/** Fewest entries for placement rounds; smaller events play one A/B drop flight. */
+const MIN_PLACEMENT = 4;
+
+/** Position of each seed (0 = seed 1) among n slots, standard bracket placement: seed 1 top, seed 2 bottom, 3–4 quarters… */
+function seedPositions(n: number): number[] {
+  const lines = seedLines(nextPow2(Math.max(1, n))).slice(0, n);
+  const sorted = [...lines].sort((a, b) => a - b);
+  return lines.map((l) => sorted.indexOf(l));
+}
+
+/**
+ * Drop flight with placement rounds ("A/B/C/D by results"). Fixed when published: nothing is
+ * re-paired later.
+ *   Ranking: the organizer's seeding order exactly (by lot after the seeds with "Random draw").
+ *   Round 1: top half of the ranking v bottom half: 1 v N/2+1, 2 v N/2+2 … ("Close levels"),
+ *            or 1 v N, 2 v N−1 … ("Ranked order"). Never two from the same half.
+ *   Round 2: winners play winners (upper) and losers play losers (lower), paired the same way.
+ *   Byes (config.placementByes), always to the top-ranked:
+ *     round1 (default): the top of the seeding order skips round 1, as many as make the flights clean
+ *                       knockout sizes (48 → 16 byes → flights of 16, 16, 8, 8);
+ *     round2:           the best of each round-2 group skip round 2 (24 → 8 byes → flights of 16 and 8);
+ *     flights:          no placement byes; each flight's Round 1 takes them (48 → flights of 12, 4 byes each).
+ *   Flights: upper winners (and bye holders) → A, upper losers → B; lower → C and D. Each flight is
+ *            a seeded knockout with rounds named Round 1, Round 2 … Semi-final, Final.
+ * Odd field: the top seed gets a round-1 bye (a win). Nobody gets more than one bye.
+ * Round 1 and round 2 matches sit in standard seed positions (seed 1 top, seed 2 bottom).
+ */
+function placementDraw(input: DrawInput): DrawPlan {
+  const { event, entryIds, seeds, clubOf } = input;
+  if (entryIds.length < MIN_PLACEMENT) {
+    const plan = dropFlightDraw({ ...input, event: { ...event, config: { ...event.config, variant: 'AB' } } });
+    return {
+      ...plan,
+      warnings: [`Placement rounds need at least ${MIN_PLACEMENT} entries, so this draw is one A/B drop flight.`, ...plan.warnings],
+    };
+  }
+  const rand = mulberry32(input.rngSeed);
+  const ranked = event.config.pairing === 'classic';
+  const byeMode = event.config.placementByes ?? 'round1';
+  /** Byes a knockout of n players needs (0 for 2, 4, 8, 16 …). */
+  const flightByes = (n: number) => (n < 2 ? 0 : nextPow2(n) - n);
+  const sameClub = (x: ID | 'BYE', y: ID | 'BYE') => x !== 'BYE' && y !== 'BYE' && !!clubOf(x) && clubOf(x) === clubOf(y);
+
+  // Round 1 in rank order: from the draw editor (its lines are in seed positions), or from the ranking
+  let rankPairs: [ID | 'BYE', ID | 'BYE'][];
+  if (input.lines) {
+    const shown: [ID | 'BYE', ID | 'BYE'][] = [];
+    for (let l = 0; l < input.lines.length; l += 2) shown.push([input.lines[l], input.lines[l + 1]]);
+    const at = seedPositions(shown.length);
+    rankPairs = at.map((p) => shown[p]);
+  } else {
+    const ranking = event.config.pairing === 'random' ? [...entryIds.slice(0, seeds), ...shuffle(entryIds.slice(seeds), rand)] : entryIds;
+    // round-1 byes for the top of the list: one for an odd field, or (round1) as many as make clean flights
+    let r1Byes = ranking.length % 2;
+    if (byeMode === 'round1') {
+      let best = Infinity;
+      for (let b = ranking.length % 2; b <= ranking.length / 2; b += 2) {
+        const played = (ranking.length - b) / 2; // round-1 matches = losers in the lower group
+        if (played < 4 && ranking.length >= 8) continue; // keep at least 4 players in the lower group
+        const upper = b + played;
+        const cost = [Math.ceil(upper / 2), Math.floor(upper / 2), Math.ceil(played / 2), Math.floor(played / 2)].reduce(
+          (s, n) => s + flightByes(n),
+          0,
+        );
+        if (cost < best) [best, r1Byes] = [cost, b];
+      }
+    }
+    const byes = ranking.slice(0, r1Byes);
+    const rest = ranking.slice(r1Byes);
+    const top = rest.slice(0, rest.length / 2);
+    const bottom = rest.slice(rest.length / 2);
+    if (ranked) bottom.reverse();
+    // clubmates apart: swap within the bottom half, nearest first (pairs stay top v bottom)
+    for (let i = 0; i < top.length; i++) {
+      if (!sameClub(top[i], bottom[i])) continue;
+      const order = bottom
+        .map((_, j) => j)
+        .filter((j) => j !== i)
+        .sort((x, y) => Math.abs(x - i) - Math.abs(y - i));
+      const j = order.find((k) => !sameClub(top[i], bottom[k]) && !sameClub(top[k], bottom[i]));
+      if (j !== undefined) [bottom[i], bottom[j]] = [bottom[j], bottom[i]];
+    }
+    rankPairs = [...byes.map((b) => [b, 'BYE'] as [ID, 'BYE']), ...top.map((t, i) => [t, bottom[i]] as [ID, ID])];
+  }
+
+  const stages: Stage[] = [];
+  const matches: Match[] = [];
+  const warnings: string[] = [];
+  const placementStage = (key: string, name: string, order: number) => {
+    const st: Stage = { ...makeStage(event.id, key, name, order, 2), rounds: 1, placement: true };
+    stages.push(st);
+    return st;
+  };
+  const won = (m: Match): SlotSource => ({ kind: 'winner', matchId: m.id });
+  const lost = (m: Match): SlotSource => ({ kind: 'loser', matchId: m.id });
+  const real = (m: Match) => !isByeSrc(m.srcA) && !isByeSrc(m.srcB);
+  /** An entry's place in the seeding order (lower = better). */
+  const seedOrder = new Map(entryIds.map((id, i) => [id, i]));
+  const seedRank = (s: SlotSource) => (s.kind === 'entry' ? (seedOrder.get(s.entryId) ?? entryIds.length) : entryIds.length);
+  /** A player's place in a group, best first; `rested` = already had a bye. */
+  type Seat = { src: SlotSource; rested: boolean };
+
+  // Round 1
+  const s1 = placementStage('R1', 'Round 1', 0);
+  const at1 = seedPositions(rankPairs.length);
+  const r1 = rankPairs.map(([a, b], k) => {
+    const m = blankMatch(event.id, s1.id, 1, at1[k], lineSource(a), lineSource(b));
+    if (real(m)) m.loserTo = 'Round 2 lower';
+    return m;
+  });
+  s1.size = r1.length * 2;
+  matches.push(...r1);
+
+  /**
+   * Round 2 over one group (best first). Byes go to the best-ranked who haven't had one, as many as
+   * make both resulting flights clean knockout sizes (fewest flight byes; then the fewest round-2 byes).
+   */
+  const round2 = (key: string, name: string, order: number, seats: Seat[], loserTo: string) => {
+    const st = placementStage(key, name, order);
+    const G = seats.length;
+    // round2 byes: at most half the group gets one, and the losers' flight needs at least 2 players.
+    // Otherwise everyone plays (an odd group's best player not yet rested gets the one bye).
+    let games = Math.floor(G / 2);
+    let best = Infinity;
+    for (let m = Math.floor(G / 2); byeMode === 'round2' && m >= 1; m--) {
+      if (G - 2 * m > G / 2 || (m < 2 && G >= 4)) continue;
+      const cost = flightByes(G - m) + flightByes(m);
+      if (cost < best) [best, games] = [cost, m];
+    }
+    const byeCount = G - 2 * games;
+    const fresh = seats.filter((x) => !x.rested);
+    const byes = [...fresh, ...seats.filter((x) => x.rested)].slice(0, byeCount);
+    const playing = seats.filter((x) => !byes.includes(x));
+    const top = playing.slice(0, games);
+    const bottom = playing.slice(games);
+    if (ranked) bottom.reverse();
+    const at = seedPositions(games);
+    const ms = top.map((t, k) => {
+      const m = blankMatch(event.id, st.id, 1, at[k], t.src, bottom[k].src);
+      m.loserTo = loserTo;
+      return m;
+    });
+    st.size = ms.length * 2;
+    matches.push(...ms);
+    // winners: bye holders first (best-ranked), then the round-2 winners in rank order
+    // a match with someone who already had a bye: whoever comes out of it may be that player
+    const hadBye = (k: number) => top[k].rested || bottom[k].rested;
+    const winners: Seat[] = [...byes.map((x) => ({ src: x.src, rested: true })), ...ms.map((m, k) => ({ src: won(m), rested: hadBye(k) }))];
+    const losers: Seat[] = ms.map((m, k) => ({ src: lost(m), rested: hadBye(k) }));
+    return { winners, losers };
+  };
+  const upper = round2(
+    'R2U',
+    'Round 2 upper',
+    1,
+    r1.map((m) => ({ src: won(m), rested: !real(m) })),
+    'B flight',
+  );
+  const lower = round2(
+    'R2L',
+    'Round 2 lower',
+    2,
+    // best first by the expected loser's own place in the seeding order (not the match's), so round-2
+    // byes go to the best C players, never to a D player who lost to an A (Ranked order: A1 v D12 …)
+    r1
+      .filter(real)
+      .map((m) => ({ m, rank: Math.max(seedRank(m.srcA), seedRank(m.srcB)) }))
+      .sort((x, y) => x.rank - y.rank)
+      .map(({ m }) => ({ src: lost(m), rested: false })),
+    'D flight',
+  );
+
+  /** A flight: seeded knockout over the players placed into it, best-placed on the top seed lines. */
+  const flight = (label: FlightLabel, order: number, seats: Seat[]) => {
+    if (seats.length < 2) {
+      if (seats.length === 1) warnings.push(`Flight ${label} has only one player, so it has no matches.`);
+      return;
+    }
+    const size = nextPow2(seats.length);
+    const lineOf = seedLines(size);
+    // any flight byes (only when the numbers can't be made clean) skip players who already had one
+    const extra = size - seats.length;
+    const first = seats.filter((x) => !x.rested).slice(0, extra);
+    const srcs = [...first, ...seats.filter((x) => !first.includes(x))].map((x) => x.src);
+    const fl: SlotSource[] = Array.from({ length: size }, () => ({ kind: 'bye' }));
+    srcs.forEach((x, k) => (fl[lineOf[k]] = x));
+    // rounds are named Round 1, Round 2 … Semi-final, Final
+    const st: Stage = { ...makeStage(event.id, label, `${label} flight`, order, size, label), numberedRounds: true };
+    stages.push(st);
+    matches.push(...buildBracket(st, fl));
+  };
+  flight('A', 3, upper.winners);
+  flight('B', 4, upper.losers);
+  flight('C', 5, lower.winners);
+  flight('D', 6, lower.losers);
   return { stages, groups: [], matches, warnings };
 }
 
@@ -483,8 +682,10 @@ function roundRobinDraw({ event, entryIds, seeds, rngSeed, clubOf, levelOf }: Dr
 export function roundName(stage: Stage, round: number, short = false): string {
   if (stage.kind === 'group') return short ? `R${round}` : `Round ${round}`;
   if (stage.name === '3rd place') return short ? '3/4' : '3rd place';
+  if (stage.placement) return short ? (stage.order === 0 ? 'R1' : 'R2') : stage.name;
   const left = stage.rounds - round;
   if (left === 0) return short ? 'F' : 'Final';
+  if (stage.numberedRounds && (round === 1 || left > 1)) return short ? `R${round}` : `Round ${round}`;
   if (left === 1) return short ? 'SF' : 'Semi-final';
   if (left === 2) return short ? 'QF' : 'Quarter-final';
   return short ? `R${2 ** (left + 1)}` : `Round of ${2 ** (left + 1)}`;
@@ -493,6 +694,6 @@ export function roundName(stage: Stage, round: number, short = false): string {
 /** Matches guaranteed to every entry that didn't get a bye. */
 export function guaranteedMatches(mode: TEvent['mode'], variant: TEvent['config']['variant'], plate: boolean): number | 'all' {
   if (mode === 'round_robin') return 'all';
-  if (mode === 'drop_flight') return variant === 'ABCD' ? 3 : 2;
+  if (mode === 'drop_flight') return variant === 'ABCD' || variant === 'PLACEMENT' ? 3 : 2;
   return plate ? 2 : 1;
 }

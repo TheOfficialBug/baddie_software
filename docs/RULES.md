@@ -48,10 +48,13 @@ Source: `src/engine/rules.ts` (BWF Laws 7, 8 and 16, plus common club formats).
 
 - The default for new tournaments is BWF 3×21. Tournaments starting on or after **4 January 2027**
   default to BWF 3×15 (the code records this as the date BWF switches to 3×15).
-- **Opening round in a shorter format.** An event can play its first round in another format and
-  the rest in the main one. Iowa Open Test 26 uses one game to 30 in round 1, then best of 3 to 21.
-  - Knockout and drop flight: round 1 of every bracket uses the opening format. That includes the
-    main draw or A flight, every lower flight and the plate, but never the 3rd-place match.
+- **Each player's first match in a shorter format.** An event can play every player's first match
+  in another format and the rest in the main one. Iowa Open Test 26 uses one game to 30 for each
+  player's first match, then best of 3 to 21.
+  - Knockout and drop flight: a match uses the first-match format when either player hasn't played
+    in the event yet. A player who had a bye in round 1 plays their first real match (usually round 2)
+    in it, even when their opponent has already played. Players who drop to a lower flight or the
+    plate have already played, so those matches use the main format, and so does the 3rd-place match.
   - Round robin: every group match uses the opening format; the knockout after the groups uses the
     main format.
 
@@ -156,11 +159,51 @@ Everyone starts in flight A. Each flight crowns its own champion.
 | ------- | ------------------------------------------------------------------------------- | ------------------ |
 | A/B/C/D | Lose in A round 1 → C · lose in A round 2 → B · lose in C round 1 → D          | 3                  |
 | A/B     | Lose in A round 1 → B                                                           | 2                  |
+| By results (placement) | Round 1: top half v bottom half. Round 2: winners v winners, losers v losers. Then: upper winners → A, upper losers → B, lower winners → C, lower losers → D | 3 for most |
 
 - Lower flights are built only from losers of **real** matches. A bye never leaves an empty place
   further down, but a player with a bye in A has one fewer guaranteed match.
 - Losers fill a lower flight in the standard seed positions, in the order of the matches they
   came from. Neighbours are spread apart and any byes fall in the standard places.
+- **By results (placement rounds)** is the default for new events. The first two rounds are placement rounds, not
+  elimination: they sort everyone into a flight by results, and the level only decides who plays whom.
+  1. The ranking is the **Seeding order** list exactly as the organizer leaves it (by default: seeds, then level
+     A → D). With "Random draw" pairing, everyone after the seeds is ordered by lot.
+  2. Round 1: top half v bottom half by count, never two from the same half. The Pairing setting picks who meets
+     whom: **Close levels** 1 v N/2+1, 2 v N/2+2 … (A v C, B v D with equal level counts) or **Ranked order**
+     1 v N, 2 v N−1 … (A v D, B v C: the B/C borderline is decided head to head).
+     With an odd number the top-ranked player gets a bye (counted as a win).
+  3. Round 2 is fixed when the draw is published: round-1 winners (upper group) and losers (lower group) are
+     each paired the same way as round 1 (A v B upper, C v D lower when results go to form). Each group is
+     ordered by the expected player's own place in the seeding order: the upper group by each round-1 match's
+     better-ranked player, the lower group by its lower-ranked player. So with Ranked order (A1 v D12 …) the D
+     losers are at the bottom of the lower group, not the top. The **best-ranked players in each group get byes**
+     here (e.g. A1–A8 and C1–C8, never a D), as many as make both resulting flights clean
+     knockout sizes (24 → 8 byes + 8 matches → flights of 16 and 8), at most half the group. Round 2 never mixes
+     winners and losers of round 1.
+  4. Upper round-2 winners → Flight A, losers → B; lower winners → C, losers → D. Each flight is a seeded
+     knockout, and its rounds are named **Round 1, Round 2 … Semi-final, Final**.
+  - **Nobody is knocked out before their third game.** Games 1 and 2 only place you; game 3 (flight Round 1) is the
+    first one you can go out in (a bye counts as a game).
+  - **Byes always go to the top of the seeding order. The "Byes" setting picks where:**
+    - **Placement round 1** (default): the top players skip round 1, as many as make every flight a clean knockout
+      (48 entries → 16 byes; flights of 16, 16, 8, 8). Round 1 is then played by the rest of the list, so lower
+      levels can meet each other there (12 per level: B v C ×4, B v D ×4, C v D ×8).
+    - **Placement round 2**: everyone plays round 1; the best of each round-2 group skip round 2 (see 3; flights of
+      16, 8, 16, 8).
+    - **In the flights**: everyone plays both placement rounds; each flight's Round 1 has the byes (flights of 12,
+      4 byes each, one level per flight).
+  - An odd field always gives the top seed a round-1 bye. When the numbers can't be made clean (e.g. 33 entries) a
+    flight's **Round 1** gets a few byes too; never a later round. Nobody gets more than one bye.
+  - **Upsets:** results decide. A D player who beats a B player in round 1 takes the B player's place in the upper
+    group (and its round-2 match); the B player takes theirs in the lower group. Nobody is moved back.
+  - **The draw never changes after publishing.** Round-2 opponents are known slots ("winner of #12"), filled as
+    results come in. Because of this, after an upset the round-2 pairs are the published ones, not re-sorted.
+  - Clubmates are kept apart in round 1 where possible.
+  - Layout: round 1 and round 2 matches sit in standard seed positions (seed 1 at the top, seed 2 at the bottom,
+    3–4 in the other quarters). The Placement tab shows round 1, then round 2 upper and lower with the players who go
+    straight into Flight A or C.
+  - With fewer than 4 entries the event is one A/B drop flight and the draw says why.
 - A/B/C/D needs at least 4 real first-round matches and a draw of 8 or more. Otherwise the draw
   uses A/B and says why.
 
@@ -210,7 +253,10 @@ Source: `src/engine/draws.ts` (GCR 11.4–11.11).
 
 - Byes go to the seeds in seed order, then to the next seed positions. This spreads byes evenly
   through the draw.
-- In level-based pairing (section 6) byes go to the top-ranked entries.
+- In level-based pairing (section 6) byes go to the top-ranked entries, with one exception: if more than half
+  of the entries left to play round 1 are the same level, a few of them swap with the lowest-ranked unseeded
+  bye-holders of other levels, so round 1 isn't level against same level. Seeds always keep their byes, and a
+  swap is skipped if it would make keeping clubmates apart impossible.
 
 ## 6. First-round pairing
 
@@ -227,10 +273,12 @@ The organizer picks one of three:
 For Close levels and Ranked order:
 
 1. Rank every entry: seeds first (in the organizer's order), then by level A → D. Ties within a level are drawn by lot.
-2. The top-ranked get the byes.
+2. The top-ranked get the byes (but see Byes in section 5: when round 1 would be mostly one level, a few
+   lower-ranked unseeded entries of other levels play round 1 instead).
 3. Split everyone else into a top half and a bottom half and pair them in order:
    - Close levels: top 1 v bottom 1, top 2 v bottom 2, …
    - Ranked order: top 1 v bottom last, top 2 v bottom second-last, …
+   When clubmates would meet, the swap that fixes it avoids creating a same-level pair if it can.
 4. Pairs are placed on the seed positions in rank order, so the strongest pairs land in
    different halves and quarters, just like seeds. Pairs of equal standing are placed by lot.
 

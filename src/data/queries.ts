@@ -56,7 +56,7 @@ export interface Champion {
 export function champions(lk: Lookup, ev: TEvent): Champion[] {
   const out: Champion[] = [];
   for (const s of lk.stagesOf(ev.id)) {
-    if (s.kind !== 'knockout') continue;
+    if (s.kind !== 'knockout' || s.placement) continue;
     const final = lk.matchesOfEvent(ev.id).find((m) => m.stageId === s.id && m.round === s.rounds);
     if (final?.status === 'finished' && final.winner) {
       out.push({

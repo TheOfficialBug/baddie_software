@@ -57,8 +57,14 @@ export function Select({
   disabled,
   className,
   'aria-label': ariaLabel,
+  title,
   placeholder = 'Choose…',
-}: SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }) {
+  renderValue,
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  placeholder?: string;
+  /** What the closed button shows for the chosen value (default: the option's label). */
+  renderValue?: (value: string) => ReactNode;
+}) {
   const options = optionsFrom(children);
   const current = String(value ?? '');
   const selected = options.find((o) => o.value === current);
@@ -177,6 +183,7 @@ export function Select({
         type="button"
         disabled={disabled}
         aria-label={ariaLabel}
+        title={title}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
@@ -189,7 +196,9 @@ export function Select({
         }}
         className={cn('field flex items-center gap-2 text-left', open && 'border-info ring-[3px] ring-info/20', className)}
       >
-        <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-faint')}>{selected?.label ?? placeholder}</span>
+        <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-faint')}>
+          {selected ? (renderValue ? renderValue(selected.value) : selected.label) : placeholder}
+        </span>
         <Icon name="down" size={18} className={cn('shrink-0 text-muted transition-transform duration-150', open && 'rotate-180')} />
       </button>
       {open &&

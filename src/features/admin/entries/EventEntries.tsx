@@ -21,6 +21,7 @@ import { Empty } from '@/components/ui/Empty';
 import { HelpTip } from '@/components/ui/HelpTip';
 import { Icon } from '@/components/ui/Icon';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { Select } from '@/components/ui/Select';
 import { Segmented } from '@/components/ui/Tabs';
 
@@ -28,15 +29,43 @@ import { AddEntryDialog } from '@/features/admin/entries/AddEntryDialog';
 
 const seedHelp = GLOSSARY.find((g) => g.term === 'Seed')?.body;
 
+type SortBy = 'seed' | 'name' | 'club' | 'level' | 'newest';
+const SORTS: { value: SortBy; label: string }[] = [
+  { value: 'seed', label: 'Seeding order' },
+  { value: 'name', label: 'Name (A–Z)' },
+  { value: 'club', label: 'Club (A–Z)' },
+  { value: 'level', label: 'Level (strongest first)' },
+  { value: 'newest', label: 'Newest first' },
+];
+/** Lower-case text without accents, for forgiving search. */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament; ev: TEvent; onEdit: () => void }) {
   const setLevel = useStore((s) => s.setEntryLevel);
   const setStatus = useStore((s) => s.setEntryStatus);
   const [filter, setFilter] = useState<'all' | Entry['status']>('all');
   const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('seed');
   const entries = lk.entriesOf(ev.id);
+  const words = fold(q).split(/\s+/).filter(Boolean);
+  const byName = (a: Entry, b: Entry) => lk.entryName(a.id).localeCompare(lk.entryName(b.id));
+  const bySeed = (a: Entry, b: Entry) => (a.seed ?? 99) - (b.seed ?? 99) || a.createdAt - b.createdAt;
+  const compare: Record<SortBy, (a: Entry, b: Entry) => number> = {
+    seed: bySeed,
+    name: byName,
+    club: (a, b) => (lk.entryClub(a.id) ?? '').localeCompare(lk.entryClub(b.id) ?? '') || byName(a, b),
+    level: (a, b) => lk.entryLevel(b.id) - lk.entryLevel(a.id) || byName(a, b),
+    newest: (a, b) => b.createdAt - a.createdAt,
+  };
   const shown = entries
     .filter((e) => filter === 'all' || e.status === filter)
-    .sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99) || a.createdAt - b.createdAt);
+    .filter((e) => {
+      if (!words.length) return true;
+      const text = fold(`${lk.entryName(e.id)} ${lk.entryClub(e.id) ?? ''}`);
+      return words.every((w) => text.includes(w));
+    })
+    .sort(compare[sortBy]);
   const locked = ev.drawState === 'published';
   const accepted = entries.filter((e) => e.status === 'accepted').length;
   const pending = entries.filter((e) => e.status === 'pending').length;
@@ -103,6 +132,26 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
         </Button>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput
+          value={q}
+          onChange={setQ}
+          placeholder="Search player, partner or club"
+          label={`Search ${ev.name} entries`}
+          className="min-w-0 flex-1 basis-[220px]"
+        />
+        <label className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+          Sort by
+          <Select aria-label="Sort entries by" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} className="w-auto">
+            {SORTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      </div>
+
       {locked && (
         <p className="flex items-start gap-2 rounded-2xl bg-sunken p-4 text-[14px] text-muted">
           <Icon name="info" size={18} className="mt-0.5 text-fg" />
@@ -119,8 +168,14 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
       {shown.length === 0 ? (
         <Empty
           icon="users"
-          title={filter === 'pending' ? 'Nothing to confirm' : 'No entries here'}
-          body={filter === 'all' ? 'Players appear here when they register, or you can add them yourself.' : 'Try another filter.'}
+          title={words.length ? `No entries match “${q.trim()}”` : filter === 'pending' ? 'Nothing to confirm' : 'No entries here'}
+          body={
+            words.length
+              ? 'Check the spelling, or search by first name, surname or club.'
+              : filter === 'all'
+                ? 'Players appear here when they register, or you can add them yourself.'
+                : 'Try another filter.'
+          }
         />
       ) : (
         <ul className="panel divide-y divide-line overflow-hidden">

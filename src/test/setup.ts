@@ -38,7 +38,10 @@ if (!HTMLDialogElement.prototype.showModal) {
   HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
     this.open = true;
   };
+  // like browsers: closing an open dialog fires "close" (React's onClose), even when code closed it
   HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) {
+    if (!this.open) return;
     this.open = false;
+    this.dispatchEvent(new Event('close'));
   };
 }

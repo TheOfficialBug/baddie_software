@@ -9,7 +9,8 @@ export type SkillLevel = 'A' | 'B' | 'C' | 'D';
 export type EventKind = 'MS' | 'WS' | 'MD' | 'WD' | 'XD';
 export type Mode = 'round_robin' | 'drop_flight' | 'knockout';
 export type FlightLabel = 'A' | 'B' | 'C' | 'D';
-export type DropVariant = 'AB' | 'ABCD';
+/** AB · ABCD · PLACEMENT: two placement rounds sort everyone into flights A–D by results. */
+export type DropVariant = 'AB' | 'ABCD' | 'PLACEMENT';
 export type ResultType = 'normal' | 'retired' | 'walkover' | 'dq';
 export type RulesId = 'BWF_3x21' | 'BWF_3x15' | 'ONE_21' | 'ONE_15' | 'ONE_30' | 'ONE_31' | 'ONE_11';
 
@@ -77,6 +78,12 @@ export interface EventConfig {
   seeds: number;
   /** How unseeded entries are paired: by skill level (balanced/classic) or BWF draw by lot. Default balanced. */
   pairing?: 'balanced' | 'classic' | 'random';
+  /**
+   * Drop flight by results: where byes go. round1 (default): the top-ranked skip round 1, as many as make the
+   * flights clean knockout sizes · round2: the best of each round-2 group skip round 2 · flights: no placement
+   * byes; flights take byes in their Round 1. An odd field always gives the top seed a round-1 bye.
+   */
+  placementByes?: 'round1' | 'round2' | 'flights';
   /** Scoring for the opening round only (e.g. one game to 30); later rounds use the event's rules. */
   firstRound?: RulesId;
 }
@@ -107,6 +114,10 @@ export interface Stage {
   order: number;
   size: number; // draw size (knockout lines) or 0 for groups
   rounds: number;
+  /** A placement round (drop flight by results): one round that sorts players, not a knockout with a final. */
+  placement?: boolean;
+  /** Rounds named "Round 1, Round 2 … Semi-final, Final" (flights after placement rounds; byes only in Round 1). */
+  numberedRounds?: boolean;
 }
 
 export interface Group {

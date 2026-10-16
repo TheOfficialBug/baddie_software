@@ -61,7 +61,7 @@ erDiagram
 | | `player_private` | Email, phone, birth year. Readable only by the player and organizers they registered with. |
 | Tournament | `tournaments` | Slug, dates, venue, status `draft → registration → closed → live → completed → archived`, default scoring (`rules_id` + `first_round_rules_id`), rest minutes, match-number counter. |
 | | `courts` | Named courts with order and active flag. |
-| | `events` | MS/WS/MD/WD/XD with draw config as real columns: mode (round robin, drop flight, knockout), group size, advance, AB/ABCD, 3rd place, plate, seeds, pairing (balanced/classic/random), scoring override, entry cap, fee. |
+| | `events` | MS/WS/MD/WD/XD with draw config as real columns: mode (round robin, drop flight, knockout), group size, advance, AB/ABCD/PLACEMENT (A–D by placement rounds) and where placement byes go (round 1 / round 2 / flights), 3rd place, plate, seeds, pairing (balanced/classic/random), scoring override, entry cap, fee. |
 | Registration | `registrations` | Player × tournament, payment status. |
 | | `entries` | A team in an event: status, seed, looking-for-partner. |
 | | `entry_players` | 1 player (singles) or 2 (doubles), each with the skill level they gave **for this event** (singles and doubles levels can differ). |

@@ -8,19 +8,21 @@ import { cn } from '@/lib/cn';
 import type { Lookup } from '@/data/lookup';
 
 import { DrawCanvas } from '@/components/draw/DrawCanvas';
+import { useShowLevels } from '@/components/draw/showLevels';
 import { BracketMatch } from '@/components/match/Match';
 import { FlightBadge } from '@/components/tournament/Badges';
 import { Icon } from '@/components/ui/Icon';
 
 const SLOT = 68; // px per first-round match in the tree (two 28px rows + gap)
 
-/** Matches that never get played (a bye): left out of the tree; the player appears in the next round. */
+/** Matches that never get played (a bye). Not counted as matches, but still drawn so everyone starts on the left. */
 const hidden = (m: Match) => m.status === 'bye' || m.srcA.kind === 'bye' || m.srcB.kind === 'bye';
 
 /**
  * Knockout bracket as a canvas (Challonge-style): every round side by side with connector lines,
  * scrollable both ways on any screen, zoomable, round names pinned while scrolling down.
- * With `editLine`, every first-round line (byes too) is drawn by the caller: the draw editor.
+ * Every first-round line is drawn, byes too, so each player starts in the left column in draw order.
+ * With `editLine`, the first-round lines are drawn by the caller: the draw editor.
  */
 export function Bracket({
   lk,
@@ -49,15 +51,16 @@ export function Bracket({
     return out;
   }, [matches, stage.rounds]);
   const final = rounds[rounds.length - 1]?.[0];
-  const champion = final && (final.status === 'finished' || final.status === 'bye') && final.winner ? final[final.winner] : null;
+  const champion =
+    !stage.placement && final && (final.status === 'finished' || final.status === 'bye') && final.winner ? final[final.winner] : null;
   const h = Math.max(1, rounds[0]?.length ?? 1) * SLOT;
-  // while editing, round-1 byes are drawn too (their player can be moved)
-  const isHidden = (m: Match, round: number) => (editLine && round === 0 ? false : hidden(m));
-  const byes = editLine ? 0 : (rounds[0]?.filter(hidden).length ?? 0);
+  // first-round byes are drawn ("Player vs Bye"); later rounds only hide matches that never happen
+  const isHidden = (m: Match, round: number) => (round === 0 ? false : hidden(m));
   // Columns as wide as the longest name in this draw (doubles pairs too), so names show in full:
   // ~6.5px a character at 12.5px, plus the number gutter, a seed tag and up to three game scores.
   const longest = Math.max(12, ...matches.flatMap((m) => [m.a, m.b]).map((e) => (e && e !== 'BYE' ? lk.entryName(e).length : 14)));
-  const colWidth = Math.min(380, Math.max(180, Math.round(longest * 6.5 + 32 + 26 + 56)));
+  const levelTag = useShowLevels() ? 34 : 0; // "B/C" on organizer pages
+  const colWidth = Math.min(420, Math.max(180, Math.round(longest * 6.5 + 32 + 26 + 56 + levelTag)));
 
   return (
     <section className="min-w-0" aria-label={stage.name}>
@@ -153,11 +156,6 @@ export function Bracket({
           )}
         </div>
       </DrawCanvas>
-      {byes > 0 && (
-        <p className="mt-1.5 text-[12.5px] text-muted">
-          {byes} {byes === 1 ? 'player has a first-round bye and starts' : 'players have first-round byes and start'} in round 2.
-        </p>
-      )}
     </section>
   );
 }

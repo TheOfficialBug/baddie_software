@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { fillFreeCourts } from '@/data/assign';
-import { setEntryLevel } from '@/data/ops';
+import { rulesOfMatch, setEntryLevel } from '@/data/ops';
 import { buildIowaOpen, IOWA_OPEN_ID } from '@/data/seed/iowaOpen';
 import { drawAll } from '@/data/simulate';
 
@@ -52,5 +52,44 @@ describe('correcting a level given at registration', () => {
     const e = { ...solo, id: 'e-solo', playerIds: solo.playerIds.slice(0, 1), pendingPartner: { name: 'Robin Vale', level: 'B' as const } };
     const next = setEntryLevel({ ...db, entries: [...db.entries, e] }, e.id, 1, 'D');
     expect(next.entries.find((x) => x.id === e.id)!.pendingPartner!.level).toBe('D');
+  });
+});
+
+describe('first-match scoring on a real draw', () => {
+  // Iowa Open: one game to 30 for each player's first match, then best of 3 to 21.
+  // Men's singles is an ABCD drop flight with 42 players, so flight A has byes.
+  const db = drawAll(buildIowaOpen(NOW), IOWA_OPEN_ID, 42);
+  const ms = db.events.find((e) => e.tournamentId === IOWA_OPEN_ID && e.kind === 'MS')!;
+  const stages = db.stages.filter((s) => s.eventId === ms.id);
+  const flightA = stages.find((s) => s.flight === 'A')!;
+  const ms_ = db.matches.filter((m) => m.eventId === ms.id);
+  const byId = new Map(ms_.map((m) => [m.id, m]));
+  const rules = (m: (typeof ms_)[number]) => rulesOfMatch(db, m).id;
+  const isBye = (id: string) => {
+    const f = byId.get(id)!;
+    return f.a === 'BYE' || f.b === 'BYE';
+  };
+  const fedByBye = (m: (typeof ms_)[number]) => [m.srcA, m.srcB].some((s) => s.kind === 'winner' && isBye(s.matchId));
+
+  it('every played opening match in flight A uses one game to 30', () => {
+    const r1 = ms_.filter((m) => m.stageId === flightA.id && m.round === 1 && m.a !== 'BYE' && m.b !== 'BYE');
+    expect(r1.length).toBeGreaterThan(0);
+    expect(new Set(r1.map(rules))).toEqual(new Set(['ONE_30']));
+  });
+
+  it('a player coming off a bye plays their first match to 30 in round 2; later rounds are best of 3', () => {
+    const r2 = ms_.filter((m) => m.stageId === flightA.id && m.round === 2);
+    const afterBye = r2.filter(fedByBye);
+    expect(afterBye.length).toBeGreaterThan(0);
+    expect(new Set(afterBye.map(rules))).toEqual(new Set(['ONE_30']));
+    const later = ms_.filter((m) => m.stageId === flightA.id && m.round >= 3);
+    expect(later.length).toBeGreaterThan(0);
+    expect(new Set(later.map(rules))).toEqual(new Set(['BWF_3x21']));
+  });
+
+  it('players who drop to flights B, C and D play best of 3 to 21', () => {
+    const lower = ms_.filter((m) => m.stageId !== flightA.id && m.a !== 'BYE' && m.b !== 'BYE');
+    expect(lower.length).toBeGreaterThan(0);
+    expect(new Set(lower.map(rules))).toEqual(new Set(['BWF_3x21']));
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { bwfSeedCount, generateDraw, groupCount, nextPow2 } from '@/engine/draws';
@@ -23,6 +23,7 @@ import { useConfirm } from '@/components/ui/useConfirm';
 import { DrawCheck } from '@/features/admin/draws/DrawCheck';
 import { DrawSettings } from '@/features/admin/draws/DrawSettings';
 import { SeedingList } from '@/features/admin/draws/SeedingList';
+import { restoreLevels, type Snapshot, takeSnapshot } from '@/features/admin/draws/seedingSnapshot';
 
 /** Unpublished draw choices for one event, saved on this device until the draw is published. */
 interface DrawDraft {
@@ -42,7 +43,12 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
   const updateEvent = useStore((s) => s.updateEvent);
   const nav = useNavigate();
   const { ask, dialog } = useConfirm();
+  const setEntryLevel = useStore((s) => s.setEntryLevel);
   const [seeding, setSeeding] = useState(false);
+  // the order and levels when the seeding panel opened: Cancel goes back to them
+  // Cleared by Save. A ref, not state: closing the dialog also fires its close event (which cancels),
+  // and that must see that Save already happened.
+  const seedingStart = useRef<Snapshot | null>(null);
 
   const accepted = lk.entriesOf(ev.id).filter((e) => e.status === 'accepted');
   // levels given for this event at entry (singles vs doubles can differ), else players' general level
@@ -72,6 +78,26 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
   }, [d.order, acceptedKey]);
 
   const n = order.length;
+
+  const openSeeding = () => {
+    seedingStart.current = takeSnapshot(lk, order);
+    setSeeding(true);
+  };
+  /** Discard what changed in the panel (order and levels) and close it. */
+  const cancelSeeding = () => {
+    const start = seedingStart.current;
+    seedingStart.current = null;
+    if (start) {
+      setD((x) => ({ ...x, order: start.order }));
+      restoreLevels(lk, start, setEntryLevel);
+    }
+    setSeeding(false);
+  };
+  const saveSeeding = () => {
+    seedingStart.current = null;
+    setSeeding(false);
+    toast('Seeding order saved');
+  };
   const defaultSeeds = mode === 'round_robin' ? Math.min(n, groupCount(n, cfg.groupSize)) : bwfSeedCount(n);
   const seeds = Math.min(n, d.seedsOverride ?? defaultSeeds);
 
@@ -131,7 +157,9 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
   const facts =
     mode === 'round_robin'
       ? `${groupCount(n, cfg.groupSize)} groups · ${preview?.count ?? 0} matches`
-      : `${S}-draw · ${S - n} bye${S - n === 1 ? '' : 's'} · ${preview?.count ?? 0} matches`;
+      : mode === 'drop_flight' && cfg.variant === 'PLACEMENT'
+        ? `2 placement rounds, then 4 flights · ${preview?.count ?? 0} matches`
+        : `${S}-draw · ${S - n} bye${S - n === 1 ? '' : 's'} · ${preview?.count ?? 0} matches`;
 
   return (
     <div className="flex flex-col gap-3">
@@ -176,7 +204,7 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" icon={<Icon name="ranking" size={16} />} onClick={() => setSeeding(true)}>
+            <Button size="sm" variant="ghost" icon={<Icon name="ranking" size={16} />} onClick={openSeeding}>
               Seeding order
             </Button>
             <Button
@@ -205,6 +233,18 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
         </div>
         {preview && (
           <div className="p-3 sm:px-4">
+            {mode === 'drop_flight' && cfg.variant !== 'PLACEMENT' && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-info-soft px-3 py-2 text-[13px]">
+                <Icon name="info" size={16} className="shrink-0" />
+                <span className="min-w-0 flex-1">
+                  In this format the top players get byes and round 1 is played by the rest of the list, so lower levels can meet each
+                  other. <b>By results</b> pairs the top half of your seeding order against the bottom half instead.
+                </span>
+                <Button size="sm" onClick={() => setD((x) => ({ ...x, cfg: { ...x.cfg, variant: 'PLACEMENT' } }))}>
+                  Use By results
+                </Button>
+              </div>
+            )}
             <DrawCheck lk={preview.lk} ev={draft} levelOf={strength} warnings={plan?.warnings ?? []} />
           </div>
         )}
@@ -216,22 +256,30 @@ export function DrawSetup({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TEvent
 
       <Dialog
         open={seeding}
-        onClose={() => setSeeding(false)}
+        onClose={cancelSeeding}
         side="right"
         title="Seeding order"
         subtitle={`${ev.name} · ${n} entries`}
         footer={
-          <Button variant="primary" onClick={() => setSeeding(false)}>
-            Done
-          </Button>
+          <>
+            <Button variant="ghost" onClick={cancelSeeding}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={saveSeeding}>
+              Save
+            </Button>
+          </>
         }
       >
         <SeedingList
           lk={lk}
+          eventId={ev.id}
           order={order}
           onOrderChange={(o) => setD((x) => ({ ...x, order: o }))}
+          defaultOrder={() => byStrength(order)}
           seeds={seeds}
           pairing={cfg.pairing}
+          placement={mode === 'drop_flight' && cfg.variant === 'PLACEMENT'}
           levelOf={strength}
         />
       </Dialog>

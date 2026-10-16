@@ -3,6 +3,8 @@ import type { TEvent, Tournament } from '@/engine/types';
 
 import type { Lookup } from '@/data/lookup';
 
+import { VARIANT_LABEL } from '@/components/draw/modeLabels';
+
 export const STAGES = [
   { key: 'registration', label: 'Registration', icon: 'userAdd' },
   { key: 'draws', label: 'Draws', icon: 'draws' },
@@ -47,8 +49,4 @@ export type Progress = ReturnType<typeof tournamentProgress>;
 
 /** The draw format in words, e.g. "Drop flight A/B/C/D". */
 export const formatName = (ev: TEvent) =>
-  ev.mode === 'drop_flight'
-    ? `Drop flight ${ev.config.variant === 'ABCD' ? 'A/B/C/D' : 'A/B'}`
-    : ev.mode === 'round_robin'
-      ? 'Round robin'
-      : 'Knockout';
+  ev.mode === 'drop_flight' ? `Drop flight ${VARIANT_LABEL[ev.config.variant]}` : ev.mode === 'round_robin' ? 'Round robin' : 'Knockout';

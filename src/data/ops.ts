@@ -15,7 +15,7 @@ export function rulesOf(db: DB, eventId: ID): ScoringRules {
   return RULES[ev?.rules ?? 'BWF_3x21'];
 }
 
-/** Scoring for one match (opening round may differ from the rest). */
+/** Scoring for one match (players' first match may differ from the rest). */
 export function rulesOfMatch(db: DB, m: Match): ScoringRules {
   const ev = db.events.find((e) => e.id === m.eventId);
   if (!ev) return RULES.BWF_3x21;
@@ -23,7 +23,8 @@ export function rulesOfMatch(db: DB, m: Match): ScoringRules {
     rulesIdForMatch(
       ev,
       db.stages.find((s) => s.id === m.stageId),
-      m.round,
+      m,
+      (id) => db.matches.find((x) => x.id === id),
     )
   ];
 }

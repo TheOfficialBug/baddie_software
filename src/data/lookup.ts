@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { LEVEL_VALUE } from '@/engine/pairing';
 import { groupRulesId, RULES, rulesIdForMatch, type ScoringRules } from '@/engine/rules';
-import type { Entry, Group, ID, Match, Player, Slot, Stage, TEvent, Tournament } from '@/engine/types';
+import type { Entry, Group, ID, Match, Player, SkillLevel, Slot, Stage, TEvent, Tournament } from '@/engine/types';
 
 import { useStore } from '@/data/store';
 import type { DB } from '@/data/types';
@@ -19,7 +19,7 @@ export interface Lookup {
   group: (id?: ID) => Group | undefined;
   match: (id?: ID) => Match | undefined;
   rules: (eventId: ID) => ScoringRules;
-  /** scoring for a specific match (opening round may differ) */
+  /** scoring for a specific match (players' first match may differ) */
   matchRules: (m: Match) => ScoringRules;
   /** scoring used in an event's round-robin groups */
   groupRules: (eventId: ID) => ScoringRules;
@@ -33,6 +33,8 @@ export interface Lookup {
   /** "Aarav Rao" or "Aarav Rao / Ben Lin" */
   entryName: (id?: Slot) => string;
   entryClub: (id?: Slot) => string | undefined;
+  /** Each player's level for this event (levels given at entry, else general level), named partner last. */
+  entryLevels: (id?: Slot) => SkillLevel[];
   /** Average level of an entry (A=4 … D=1) for this event: levels given at entry, else each player's general level. */
   entryLevel: (id: ID) => number;
   entriesOfPlayer: (pid: ID, tid?: ID) => Entry[];
@@ -74,7 +76,7 @@ export function makeLookup(s: LookupSource): Lookup {
     rules: (eventId) => RULES[EV.get(eventId)?.rules ?? 'BWF_3x21'],
     matchRules: (m) => {
       const ev = EV.get(m.eventId);
-      return ev ? RULES[rulesIdForMatch(ev, ST.get(m.stageId), m.round)] : RULES.BWF_3x21;
+      return ev ? RULES[rulesIdForMatch(ev, ST.get(m.stageId), m, (id) => M.get(id))] : RULES.BWF_3x21;
     },
     groupRules: (eventId) => {
       const ev = EV.get(eventId);
@@ -97,6 +99,12 @@ export function makeLookup(s: LookupSource): Lookup {
     entryClub: (id) => {
       const clubs = [...new Set(playersOfEntry(id).map((p) => p.club))];
       return clubs.length ? clubs.join(' · ') : undefined;
+    },
+    entryLevels: (id) => {
+      const e = id && id !== 'BYE' ? E.get(id) : undefined;
+      if (!e) return [];
+      const levels = e.playerIds.map((p, i) => e.levels?.[i] ?? P.get(p)?.level ?? 'C');
+      return e.pendingPartner ? [...levels, e.pendingPartner.level] : levels;
     },
     entryLevel: (id) => {
       const e = E.get(id);

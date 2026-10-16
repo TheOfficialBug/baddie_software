@@ -1,5 +1,5 @@
 // Scoring presets and score validation (BWF Laws 7, 8, 16 + common club formats).
-import type { GameScore, ResultType, RulesId, Side } from './types';
+import type { GameScore, ID, Match, ResultType, RulesId, Side, SlotSource } from './types';
 
 export interface ScoringRules {
   id: RulesId;
@@ -245,22 +245,45 @@ export function walkoverGames(r: ScoringRules, winner: Side): GameScore[] {
   return Array.from({ length: gamesToWin(r) }, () => (winner === 'a' ? [r.pointsToWin, 0] : [0, r.pointsToWin]) as GameScore);
 }
 
+type MatchLink = Pick<Match, 'srcA' | 'srcB' | 'a' | 'b'>;
+
+/** A match nobody played: one or both sides were byes. */
+const isByeMatch = (m: MatchLink) => m.srcA.kind === 'bye' || m.srcB.kind === 'bye' || m.a === 'BYE' || m.b === 'BYE';
+
 /**
- * Which scoring a match uses. Events can play their opening round shorter (e.g. one game to 30)
- * and the rest best of 3 to 21.
- *  - Knockout / drop flight: round 1 of every bracket (main draw or A flight, lower flights, plate);
- *    never the 3rd-place match.
+ * Whether the player who fills a slot hasn't played a match in the event before: they start here,
+ * or got here only through byes. Winners and losers of a played match, and players coming out of
+ * the groups, have already played.
+ */
+export function isFirstMatchSlot(src: SlotSource, match: (id: ID) => MatchLink | undefined, depth = 0): boolean {
+  if (src.kind === 'entry') return true;
+  if (src.kind !== 'winner' || depth > 8) return false;
+  const from = match(src.matchId);
+  if (!from || !isByeMatch(from)) return false;
+  // the bye match's winner is whoever was on its real side
+  const real = from.srcA.kind !== 'bye' && from.a !== 'BYE' ? from.srcA : from.srcB.kind !== 'bye' && from.b !== 'BYE' ? from.srcB : null;
+  return !!real && isFirstMatchSlot(real, match, depth + 1);
+}
+
+/**
+ * Which scoring a match uses. Events can play each player's first match shorter (e.g. one game
+ * to 30) and everything after it best of 3 to 21.
+ *  - Knockout / drop flight: a match uses the first-match format when either player hasn't played
+ *    in the event yet, so a player with a bye still gets it in their first real match (even when
+ *    their opponent has played). Players who drop to a lower flight or the plate, and the 3rd-place
+ *    match, use the main rules.
  *  - Round robin: every group match; the knockout after the groups uses the main rules.
  */
 export function rulesIdForMatch(
   ev: { rules: RulesId; mode: 'round_robin' | 'drop_flight' | 'knockout'; config: { firstRound?: RulesId } },
   stage: { kind: 'group' | 'knockout'; name: string } | undefined,
-  round: number,
+  m: MatchLink,
+  match: (id: ID) => MatchLink | undefined,
 ): RulesId {
   const fr = ev.config.firstRound;
   if (!fr || !stage) return ev.rules;
   if (ev.mode === 'round_robin') return stage.kind === 'group' ? fr : ev.rules;
-  return round === 1 && stage.name !== '3rd place' ? fr : ev.rules;
+  return isFirstMatchSlot(m.srcA, match) || isFirstMatchSlot(m.srcB, match) ? fr : ev.rules;
 }
 
 /** Scoring used in round-robin groups (for standings). */
@@ -272,5 +295,5 @@ export function groupRulesId(ev: { rules: RulesId; mode: string; config: { first
 export function rulesSummary(ev: { rules: RulesId; mode: string; config: { firstRound?: RulesId } }): string {
   const fr = ev.config.firstRound;
   if (!fr || fr === ev.rules) return RULES[ev.rules].short;
-  return `${RULES[fr].short} ${ev.mode === 'round_robin' ? 'groups' : 'round 1'}, then ${RULES[ev.rules].short}`;
+  return `${RULES[fr].short} ${ev.mode === 'round_robin' ? 'groups' : 'first match'}, then ${RULES[ev.rules].short}`;
 }

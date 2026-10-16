@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { useLookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
 
+import { ShowLevels } from '@/components/draw/showLevels';
 import { NotFound } from '@/components/NotFound';
 import { EventChip } from '@/components/tournament/Badges';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -96,12 +97,15 @@ export function DrawBuilder() {
               );
             })}
           </div>
-          {ev &&
-            (ev.drawState === 'published' ? (
-              <PublishedDraw key={ev.id} lk={lk} t={t} ev={ev} />
-            ) : (
-              <DrawSetup key={ev.id} lk={lk} t={t} ev={ev} />
-            ))}
+          {ev && (
+            <ShowLevels.Provider value>
+              {ev.drawState === 'published' ? (
+                <PublishedDraw key={ev.id} lk={lk} t={t} ev={ev} />
+              ) : (
+                <DrawSetup key={ev.id} lk={lk} t={t} ev={ev} />
+              )}
+            </ShowLevels.Provider>
+          )}
         </>
       )}
     </div>

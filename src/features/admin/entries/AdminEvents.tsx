@@ -7,6 +7,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 
 import { useLookup } from '@/data/lookup';
+import { selectDB, useStore } from '@/data/store';
 
 import { MODE_LABEL } from '@/components/draw/modeLabels';
 import { NotFound } from '@/components/NotFound';
@@ -17,8 +18,10 @@ import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FilterChips } from '@/components/ui/Tabs';
 
+import { downloadEntryList } from '@/features/admin/entries/entryListFile';
 import { EventDialog } from '@/features/admin/entries/EventDialog';
 import { EventEntries } from '@/features/admin/entries/EventEntries';
+import { ImportEntriesDialog } from '@/features/admin/entries/ImportEntriesDialog';
 
 export function AdminEvents() {
   const { tid } = useParams();
@@ -27,6 +30,7 @@ export function AdminEvents() {
   const events = t ? lk.eventsOf(t.id) : [];
   const [sel, setSel] = usePersistentState<string | undefined>(t ? `entries.event:${t.id}` : null, events[0]?.id);
   const [editing, setEditing] = useState<TEvent | 'new' | null>(null);
+  const [importing, setImporting] = useState(false);
   if (!t) return <NotFound what="tournament" />;
   const ev = lk.event(sel) ?? events[0];
   const pendingOf = (e: TEvent) => lk.entriesOf(e.id).filter((x) => x.status === 'pending').length;
@@ -38,9 +42,25 @@ export function AdminEvents() {
         title="Entries"
         description="The events players can enter, and who has entered each one. Confirm entries here before you make the draws."
         actions={
-          <Button variant="primary" icon={<Icon name="add" size={18} />} onClick={() => setEditing('new')}>
-            Add event
-          </Button>
+          <>
+            {events.length > 0 && (
+              <>
+                <Button icon={<Icon name="upload" size={18} />} onClick={() => setImporting(true)}>
+                  Import
+                </Button>
+                <Button
+                  icon={<Icon name="download" size={18} />}
+                  disabled={!events.some((e) => lk.entriesOf(e.id).length > 0)}
+                  onClick={() => downloadEntryList(selectDB(useStore.getState()), t)}
+                >
+                  Export
+                </Button>
+              </>
+            )}
+            <Button variant="primary" icon={<Icon name="add" size={18} />} onClick={() => setEditing('new')}>
+              Add event
+            </Button>
+          </>
         }
       />
 
@@ -112,6 +132,7 @@ export function AdminEvents() {
           {ev && <EventEntries key={ev.id} lk={lk} t={t} ev={ev} onEdit={() => setEditing(ev)} />}
         </div>
       )}
+      {importing && <ImportEntriesDialog t={t} onClose={() => setImporting(false)} />}
       {editing && (
         <EventDialog
           t={t}

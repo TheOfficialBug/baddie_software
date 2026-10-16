@@ -216,7 +216,7 @@ beforeAll(async () => {
           m.number || null,
           m.round,
           m.index,
-          rulesIdForMatch(ev, st, m.round),
+          rulesIdForMatch(ev, st, m, (id) => demo.matches.find((x) => x.id === id)),
           entryOrNull(m.a),
           entryOrNull(m.b),
           m.status,
@@ -301,16 +301,23 @@ describe('migration + demo import', () => {
     expect(await count(`select count(*) n from profiles`)).toBe(4);
   });
 
-  it('round 1 of the live tournament plays one game to 30, later rounds best of 3 to 21', async () => {
+  it("each player's first match in the live tournament is one game to 30, everything after best of 3 to 21", async () => {
     const rows = (
-      await db.query<{ round: number; rules_id: string }>(
-        `select distinct m.round, m.rules_id from matches m join stages s on s.id = m.stage_id join events e on e.id = m.event_id
-      where e.tournament_id = $1 and e.mode <> 'round_robin' and s.name <> '3rd place' order by 1`,
+      await db.query<{ stage: string; round: number; rules_id: string }>(
+        `select distinct s.name stage, m.round, m.rules_id from matches m join stages s on s.id = m.stage_id join events e on e.id = m.event_id
+      where e.tournament_id = $1 and e.mode <> 'round_robin' and m.status <> 'bye' order by 2`,
         [uuid('t-fall')],
       )
     ).rows;
-    expect(rows.filter((r) => r.round === 1).every((r) => r.rules_id === 'ONE_30')).toBe(true);
-    expect(rows.filter((r) => r.round > 1).every((r) => r.rules_id === 'BWF_3x21')).toBe(true);
+    const top = (r: { stage: string }) => r.stage === 'A flight' || r.stage === 'Main draw' || r.stage === 'Knockout';
+    // everyone's opening match
+    expect(rows.filter((r) => top(r) && r.round === 1).every((r) => r.rules_id === 'ONE_30')).toBe(true);
+    // by round 3 both players have always played
+    expect(rows.filter((r) => top(r) && r.round >= 3).every((r) => r.rules_id === 'BWF_3x21')).toBe(true);
+    // players in lower flights, the plate and the 3rd-place match have already played
+    expect(rows.filter((r) => !top(r)).every((r) => r.rules_id === 'BWF_3x21')).toBe(true);
+    expect(rows.some((r) => !top(r))).toBe(true);
+    expect(rows.some((r) => top(r) && r.round === 1)).toBe(true);
   });
 });
 
@@ -382,7 +389,7 @@ describe('invariants', () => {
 
   it('game scores must be possible under the match rules', async () => {
     const m = await one<{ id: string }>(`select id from matches where status = 'on_court' and rules_id = 'BWF_3x21' limit 1`);
-    const m30 = await one<{ id: string }>(`select id from matches where status = 'on_court' and rules_id = 'ONE_30' limit 1`);
+    const m30 = await one<{ id: string }>(`select id from matches where status in ('on_court', 'ready') and rules_id = 'ONE_30' limit 1`);
     expect(m?.id && m30?.id).toBeTruthy();
     {
       await rejects(() => db.query(`insert into match_games values ($1, 3, 31, 29)`, [m.id]), /not a possible score/);

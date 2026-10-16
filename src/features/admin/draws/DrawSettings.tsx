@@ -64,6 +64,17 @@ export function DrawSettings({
 }) {
   const info = MODES.find((m) => m.value === mode)!;
   const pairing = cfg.pairing ?? 'balanced';
+  const placement = mode === 'drop_flight' && cfg.variant === 'PLACEMENT';
+  // in placement rounds the choice is which bottom-half player each top-half player meets
+  const half = Math.floor(n / 2);
+  const pairingLabel = (v: NonNullable<EventConfig['pairing']>) =>
+    !placement
+      ? PAIRING[v].label
+      : v === 'balanced'
+        ? `Close levels (1 v ${half + 1})`
+        : v === 'classic'
+          ? `Ranked order (1 v ${n})`
+          : 'Random draw';
   const toggle = (label: string, on: boolean, set: (v: boolean) => void) => (
     <button
       type="button"
@@ -100,6 +111,7 @@ export function DrawSettings({
               value={cfg.variant}
               onChange={(v) => onCfgChange({ ...cfg, variant: v })}
               options={[
+                { value: 'PLACEMENT', label: 'By results' },
                 { value: 'ABCD', label: 'A–D' },
                 { value: 'AB', label: 'A–B' },
               ]}
@@ -141,32 +153,71 @@ export function DrawSettings({
           </Control>
         )}
 
-        <Control
-          label={
-            <>
-              Pairing
-              <HelpTip label="Pairing" className="-my-1">
-                <b>Close levels</b> ranks players by skill level and pairs them with someone near their level (A plays C, B plays D).{' '}
-                <b>Ranked order</b> is the classic bracket, where the top-ranked meet the lowest-ranked first (A plays D).{' '}
-                <b>Random draw</b> is the BWF draw by lot. Players from the same club are kept apart where possible in every mode; players
-                without a club don&apos;t count as clubmates.
-              </HelpTip>
-            </>
-          }
-        >
-          <Select
-            aria-label="First-round pairing"
-            value={pairing}
-            onChange={(e) => onCfgChange({ ...cfg, pairing: e.target.value as typeof pairing })}
-            className="min-h-9 w-[170px] py-1 text-[13px] font-semibold touch:min-h-11"
+        {
+          <Control
+            label={
+              <>
+                Pairing
+                <HelpTip label="Pairing" className="-my-1">
+                  {placement ? (
+                    <>
+                      Round 1 is always the top half of the seeding order against the bottom half. <b>Close levels</b>: 1 v {half + 1}, 2 v{' '}
+                      {half + 2}… (A plays C, B plays D). <b>Ranked order</b>: 1 v {n}, 2 v {n - 1}… (A plays D, B plays C, so the B/C
+                      borderline is settled head to head). <b>Random draw</b>: after the seeds, the order is drawn by lot.
+                    </>
+                  ) : (
+                    <>
+                      <b>Close levels</b> ranks players by skill level and pairs them with someone near their level (A plays C, B plays D).{' '}
+                      <b>Ranked order</b> is the classic bracket, where the top-ranked meet the lowest-ranked first (A plays D).{' '}
+                      <b>Random draw</b> is the BWF draw by lot. Players from the same club are kept apart where possible in every mode;
+                      players without a club don&apos;t count as clubmates.
+                    </>
+                  )}
+                </HelpTip>
+              </>
+            }
           >
-            {Object.entries(PAIRING).map(([v, p]) => (
-              <option key={v} value={v}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
-        </Control>
+            <Select
+              aria-label="First-round pairing"
+              value={pairing}
+              onChange={(e) => onCfgChange({ ...cfg, pairing: e.target.value as typeof pairing })}
+              className={cn('min-h-9 py-1 text-[13px] font-semibold touch:min-h-11', placement ? 'w-[210px]' : 'w-[170px]')}
+            >
+              {(Object.keys(PAIRING) as NonNullable<EventConfig['pairing']>[]).map((v) => (
+                <option key={v} value={v}>
+                  {pairingLabel(v)}
+                </option>
+              ))}
+            </Select>
+          </Control>
+        }
+
+        {placement && (
+          <Control
+            label={
+              <>
+                Byes
+                <HelpTip label="Byes" className="-my-1">
+                  Byes always go to the top of the seeding order. <b>Placement round 1</b>: the top players skip round 1, as many as make
+                  every flight a clean knockout (48 entries → 16 byes, flights of 16, 16, 8 and 8). <b>Placement round 2</b>: the best of
+                  each round-2 group skip round 2 (flights of 16, 8, 16 and 8). <b>In the flights</b>: everyone plays both placement rounds;
+                  each flight&apos;s Round 1 has the byes (flights of 12 and 4 byes each, one level per flight).
+                </HelpTip>
+              </>
+            }
+          >
+            <Select
+              aria-label="Where byes go"
+              value={cfg.placementByes ?? 'round1'}
+              onChange={(e) => onCfgChange({ ...cfg, placementByes: e.target.value as NonNullable<EventConfig['placementByes']> })}
+              className="min-h-9 w-[190px] py-1 text-[13px] font-semibold touch:min-h-11"
+            >
+              <option value="round1">Placement round 1</option>
+              <option value="round2">Placement round 2</option>
+              <option value="flights">In the flights</option>
+            </Select>
+          </Control>
+        )}
 
         <Control
           label={
@@ -194,7 +245,23 @@ export function DrawSettings({
         </Control>
       </div>
       <p className="text-[13px] text-muted">
-        <span className="font-semibold text-fg">{info.label}:</span> {info.body} Everyone plays {info.everyone}. {PAIRING[pairing].text}
+        {placement ? (
+          <>
+            <span className="font-semibold text-fg">Drop flight by results:</span> byes go to the top of the ranking (
+            {(cfg.placementByes ?? 'round1') === 'round1'
+              ? 'they skip round 1'
+              : cfg.placementByes === 'round2'
+                ? 'the best of each group skip round 2'
+                : 'in the flights’ Round 1'}
+            ); round 1 is the top half of the rest against the bottom half ({pairing === 'classic' ? 'best v worst' : 'A v C, B v D'});
+            round 2 is winners against winners and losers against losers. Round-2 winners and losers make flights A, B, C and D, and each
+            flight is a knockout. Most players get 3 or more matches. The draw is fixed once published.
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-fg">{info.label}:</span> {info.body} Everyone plays {info.everyone}. {PAIRING[pairing].text}
+          </>
+        )}
       </p>
     </div>
   );

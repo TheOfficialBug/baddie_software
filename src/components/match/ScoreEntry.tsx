@@ -63,9 +63,12 @@ export function ScoreForm({
         !m?.result || m.result === 'normal' || !m.winner ? undefined : m.result === 'walkover' ? m.winner : m.winner === 'a' ? 'b' : 'a',
     }),
   );
-  const { cells, result, special } = slip;
+  // one row per game of this match's format; a slip saved under another format is fitted to it
+  const fit = (c: string[][]) => Array.from({ length: n }, (_, i) => c[i] ?? ['', '']);
+  const cells = fit(slip.cells);
+  const { result, special } = slip;
   const setCells = (v: string[][] | ((c: string[][]) => string[][])) =>
-    setSlip((x) => ({ ...x, cells: typeof v === 'function' ? v(x.cells) : v }));
+    setSlip((x) => ({ ...x, cells: typeof v === 'function' ? v(fit(x.cells)) : v }));
   const setResult = (v: ResultType) => setSlip((x) => ({ ...x, result: v }));
   const setSpecial = (v: Side | undefined) => setSlip((x) => ({ ...x, special: v }));
   const [quick, setQuick] = useState('');

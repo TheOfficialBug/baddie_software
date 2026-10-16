@@ -8,10 +8,11 @@ import { fmtAgo, fmtElapsed } from '@/lib/format';
 
 import type { Lookup } from '@/data/lookup';
 
+import { useShowLevels } from '@/components/draw/showLevels';
 import { DurationTag } from '@/components/match/Duration';
 import { gamesFor, matchContext, sideName } from '@/components/match/matchInfo';
 import { fmtDuration, matchDuration } from '@/components/match/matchTiming';
-import { EventChip, FlightBadge, StatusPill } from '@/components/tournament/Badges';
+import { EventChip, FlightBadge, LevelTag, StatusPill } from '@/components/tournament/Badges';
 import { Icon } from '@/components/ui/Icon';
 
 const involves = (lk: Lookup, m: Match, pid?: string | null) => !!pid && [m.a, m.b].some((e) => lk.entry(e)?.playerIds.includes(pid));
@@ -32,6 +33,7 @@ export function BracketMatch({
   onOpen?: (m: Match) => void;
 }) {
   const isBye = m.status === 'bye';
+  const showLevels = useShowLevels();
   const dim = !!highlight && !involves(lk, m, highlight);
   const tid = lk.event(m.eventId)!.tournamentId;
   const court = m.status === 'on_court' ? lk.courtName(tid, m.courtId) : '';
@@ -104,6 +106,7 @@ export function BracketMatch({
                 {sideName(lk, m, side)}
                 {entry?.seed ? <span className="num ml-1 text-[10px] font-semibold text-muted">[{entry.seed}]</span> : null}
               </span>
+              {showLevels && <LevelTag levels={lk.entryLevels(slot)} className="mr-1" />}
               {sc.map((g, gi) => (
                 <span
                   key={gi}

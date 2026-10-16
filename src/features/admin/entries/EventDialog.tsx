@@ -15,7 +15,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Select } from '@/components/ui/Select';
 import { Segmented } from '@/components/ui/Tabs';
 
-const NEW_CONFIG: TEvent['config'] = { groupSize: 4, advance: 2, variant: 'ABCD', thirdPlace: false, plate: false, seeds: 0 };
+const NEW_CONFIG: TEvent['config'] = { groupSize: 4, advance: 2, variant: 'PLACEMENT', thirdPlace: false, plate: false, seeds: 0 };
 
 const MODES: { value: Mode; label: string }[] = [
   { value: 'drop_flight', label: 'Drop flight' },
@@ -60,7 +60,7 @@ export function EventDialog({ t, ev, onClose }: { t: Tournament; ev: TEvent | nu
     } else {
       const id = addEvent(t.id, {
         ...base,
-        config: { groupSize: 4, advance: 2, variant: 'ABCD', thirdPlace: false, plate: false, seeds: 0, firstRound },
+        config: { groupSize: 4, advance: 2, variant: 'PLACEMENT', thirdPlace: false, plate: false, seeds: 0, firstRound },
         drawState: 'none',
       });
       toast(`${base.name} added`);
@@ -192,7 +192,7 @@ export function EventDialog({ t, ev, onClose }: { t: Tournament; ev: TEvent | nu
               ? 'Same as the other rounds.'
               : f.mode === 'round_robin'
                 ? 'Used for every group match.'
-                : 'Used for round 1 of each draw and flight.'
+                : "Used for each player's first match, including after a bye. Players who drop to a lower flight or the plate play the normal format."
           }
         >
           {(id) => (

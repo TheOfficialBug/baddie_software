@@ -7,8 +7,9 @@ import { cn } from '@/lib/cn';
 
 import type { Lookup } from '@/data/lookup';
 
+import { useShowLevels } from '@/components/draw/showLevels';
 import { BracketMatch } from '@/components/match/Match';
-import { Pill, SeedTag } from '@/components/tournament/Badges';
+import { LevelTag, Pill, SeedTag } from '@/components/tournament/Badges';
 import { HelpTip } from '@/components/ui/HelpTip';
 import { Segmented } from '@/components/ui/Tabs';
 
@@ -122,6 +123,7 @@ export function GroupCard({
 
 function Row({ lk, r, q, complete, highlight }: { lk: Lookup; r: StandingRow; q: boolean; complete: boolean; highlight?: string | null }) {
   const entry = lk.entry(r.entryId);
+  const showLevels = useShowLevels();
   const mine = !!highlight && entry?.playerIds.includes(highlight);
   return (
     <tr className={cn('border-t border-line/80 first:border-t-0', mine && 'bg-primary/20')}>
@@ -130,6 +132,7 @@ function Row({ lk, r, q, complete, highlight }: { lk: Lookup; r: StandingRow; q:
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate font-semibold">{lk.entryName(r.entryId)}</span>
           <SeedTag seed={entry?.seed} />
+          {showLevels && <LevelTag levels={lk.entryLevels(r.entryId)} />}
           {q && (
             <Pill tone={complete ? 'lime' : 'neutral'} className="min-h-5 px-1.5 text-[11px]">
               Q

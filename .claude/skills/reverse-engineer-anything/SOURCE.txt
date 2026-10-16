@@ -1,0 +1,2 @@
+Source: https://github.com/morluto/rea (commit 42fc6c53ae188978deb3bedfe88287b6b316ba22), .agents/skills/reverse-engineer-anything
+License: MIT (see LICENSE). Instructions only; REA itself (MCP server / CLI) is not installed.

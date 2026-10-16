@@ -9,6 +9,7 @@ import { champions } from '@/data/queries';
 
 import { useAccess } from '@/auth/useAccess';
 
+import { VARIANT_LABEL } from '@/components/draw/modeLabels';
 import { EventChip } from '@/components/tournament/Badges';
 import { Avatar } from '@/components/ui/Avatar';
 import { ButtonLink } from '@/components/ui/Button';
@@ -101,7 +102,7 @@ export function RegistrationOverview() {
                   <div className="font-semibold">{ev.name}</div>
                   <div className="text-[13px] text-muted">
                     {ev.mode === 'drop_flight'
-                      ? `Drop flight ${ev.config.variant === 'ABCD' ? 'A/B/C/D' : 'A/B'}`
+                      ? `Drop flight ${VARIANT_LABEL[ev.config.variant]}`
                       : ev.mode === 'round_robin'
                         ? 'Round robin'
                         : 'Knockout'}

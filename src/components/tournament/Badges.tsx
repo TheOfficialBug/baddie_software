@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { EventKind, FlightLabel, MatchStatus, ResultType } from '@/engine/types';
+import type { EventKind, FlightLabel, MatchStatus, ResultType, SkillLevel } from '@/engine/types';
 
 import { cn } from '@/lib/cn';
 
@@ -109,6 +109,19 @@ export function StatusPill({ status, result, live }: { status: MatchStatus; resu
   if (status === 'ready') return <Pill tone="info">Up next</Pill>;
   if (status === 'bye') return <Pill tone="muted">Bye</Pill>;
   return <Pill tone="muted">Waiting</Pill>;
+}
+
+/** Skill level(s) of an entry for its event: "B", or "B/C" for a pair. */
+export function LevelTag({ levels, className }: { levels: SkillLevel[]; className?: string }) {
+  if (!levels.length) return null;
+  return (
+    <span
+      className={cn('num ml-1.5 shrink-0 rounded bg-sunken px-1 text-[10px] font-bold leading-[15px] text-muted', className)}
+      title={`Level ${levels.join(' / ')}`}
+    >
+      {levels.join('/')}
+    </span>
+  );
 }
 
 export function SeedTag({ seed }: { seed?: number }) {
