@@ -79,7 +79,10 @@ export function Home() {
         )}
         <p className="text-center text-[13px] text-muted">
           Running the tournament?{' '}
-          <Link to={access.isOrganizer ? '/admin' : '/login?next=%2Fadmin'} className="font-semibold text-fg underline underline-offset-4">
+          <Link
+            to={access.isOrganizer ? '/admin' : '/login?next=%2Fadmin'}
+            className="inline-block py-3 font-semibold text-fg underline underline-offset-4"
+          >
             {access.isOrganizer ? 'Open the organizer desk' : 'Organizer sign in'}
           </Link>
         </p>

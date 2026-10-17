@@ -333,9 +333,14 @@ export function AdminShell() {
               >
                 <Icon name={collapsed ? 'expand' : 'collapse'} size={20} />
               </IconButton>
-              <Link to="/admin" className="flex min-w-0 items-center gap-2 lg:hidden" aria-label={`${APP_NAME} organizer home`}>
-                <ShuttleMark size={30} />
-                <span className="truncate font-display text-[17px] font-extrabold">{t?.name ?? APP_NAME}</span>
+              {/* the mark never shrinks; the name shows once there's room (≥380px) */}
+              <Link
+                to="/admin"
+                className="flex min-w-0 shrink-0 items-center gap-2 xs:shrink lg:hidden"
+                aria-label={`${APP_NAME} organizer home`}
+              >
+                <ShuttleMark size={30} className="shrink-0" />
+                <span className="hidden truncate font-display text-[17px] font-extrabold xs:inline">{t?.name ?? APP_NAME}</span>
               </Link>
               {t && role && (
                 <button
@@ -348,13 +353,16 @@ export function AdminShell() {
                   <kbd className="num hidden rounded-md bg-sunken px-1.5 text-[11px] font-semibold lg:inline">Ctrl K</kbd>
                 </button>
               )}
-              <div className={cn('flex items-center gap-1.5', !(t && role) && 'ml-auto', t && role && 'lg:ml-auto')}>
+              <div className={cn('flex shrink-0 items-center gap-1 sm:gap-1.5', !(t && role) && 'ml-auto', t && role && 'lg:ml-auto')}>
                 {t && role && <PublishButton t={t} canPublish={access.can('manage_settings', t.organizationId)} />}
-                <HelpButton audience="admin" />
+                {/* the narrowest phones keep Publish in reach; help returns from 350px */}
+                <span className="hidden 2xs:inline-flex">
+                  <HelpButton audience="admin" />
+                </span>
               </div>
             </div>
           </header>
-          <main className="pb-safe-bar mx-auto w-full max-w-[1320px] flex-1 px-3 pt-4 sm:px-5 lg:px-8 lg:pt-5">{page}</main>
+          <main className="pb-safe-bar mx-auto w-full max-w-[1320px] flex-1 px-4 pt-4 sm:px-5 lg:px-8 lg:pt-5">{page}</main>
         </div>
       </div>
       {t && role && (

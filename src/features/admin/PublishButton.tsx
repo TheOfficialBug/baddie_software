@@ -25,9 +25,9 @@ export function PublishButton({ t, canPublish }: { t: Tournament; canPublish: bo
         target="_blank"
         size="sm"
         variant="soft"
-        icon={<span className="h-2 w-2 rounded-full bg-ok" aria-hidden />}
+        icon={<span className="hidden h-2 w-2 rounded-full bg-ok sm:block" aria-hidden />}
         iconRight={<Icon name="external" size={15} />}
-        className="touch:min-h-11"
+        className="px-2.5 sm:px-3.5 touch:min-h-11"
         aria-label="Published: open the public page"
       >
         <span className="hidden sm:inline">Published</span>

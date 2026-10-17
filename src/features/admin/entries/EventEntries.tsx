@@ -115,18 +115,21 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented
-          label="Entry status"
-          value={filter}
-          onChange={setFilter}
-          size="sm"
-          options={[
-            { value: 'all', label: 'All', count: entries.length },
-            { value: 'accepted', label: 'Accepted', count: accepted },
-            { value: 'pending', label: 'To confirm', count: pending },
-            { value: 'withdrawn', label: 'Withdrawn', count: entries.filter((e) => e.status === 'withdrawn').length },
-          ]}
-        />
+        {/* narrow phones: the filter scrolls sideways rather than widening the page */}
+        <div className="max-w-full overflow-x-auto">
+          <Segmented
+            label="Entry status"
+            value={filter}
+            onChange={setFilter}
+            size="sm"
+            options={[
+              { value: 'all', label: 'All', count: entries.length },
+              { value: 'accepted', label: 'Accepted', count: accepted },
+              { value: 'pending', label: 'To confirm', count: pending },
+              { value: 'withdrawn', label: 'Withdrawn', count: entries.filter((e) => e.status === 'withdrawn').length },
+            ]}
+          />
+        </div>
         <Button className="ml-auto" icon={<Icon name="userAdd" size={18} />} onClick={() => setAdding(true)}>
           Add entry
         </Button>
