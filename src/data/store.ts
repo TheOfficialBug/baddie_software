@@ -51,6 +51,8 @@ interface Actions {
   addPlayer: (p: Omit<Player, 'id'>) => ID;
   updatePlayer: (id: ID, patch: Partial<Player>) => void;
   addEntry: (eventId: ID, playerIds: ID[], status?: Entry['status'], extra?: Pick<Entry, 'levels' | 'pendingPartner'>) => ID;
+  /** A doubles player waiting for a partner gets one: the entry becomes a pair (and is accepted). */
+  completePair: (entryId: ID, playerId: ID, level: SkillLevel) => void;
   setEntryStatus: (id: ID, status: Entry['status']) => void;
   /** Fix a level given for one event; slot = player's place in the entry (after the last: the named partner). */
   setEntryLevel: (entryId: ID, slot: number, level: SkillLevel) => void;
@@ -221,6 +223,16 @@ export const useStore = create<State>()(
           set((s) => ({ entries: [...s.entries, { id, eventId, playerIds, status, createdAt: Date.now(), ...extra }] }));
           return id;
         },
+        completePair: (entryId, playerId, level) =>
+          set((s) => ({
+            entries: s.entries.map((e) => {
+              if (e.id !== entryId || e.playerIds.length !== 1) return e;
+              const first = e.levels?.[0] ?? s.players.find((p) => p.id === e.playerIds[0])?.level ?? 'C';
+              const levels = [first, level];
+              const { pendingPartner: _, ...rest } = e;
+              return { ...rest, playerIds: [...e.playerIds, playerId], levels, status: 'accepted' as const };
+            }),
+          })),
         setEntryStatus: (id, status) => set((s) => ({ entries: s.entries.map((e) => (e.id === id ? { ...e, status } : e)) })),
         setEntryLevel: (entryId, slot, level) => commit(ops.setEntryLevel(db(), entryId, slot, level)),
         register: (tid, playerId, picks, total) => {

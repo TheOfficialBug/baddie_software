@@ -17,6 +17,21 @@ Template:
 
 ---
 
+## 2026-10-17 — Add a player by hand
+
+**What:** The Entries page has an **Add player** button (next to Import). One form enters a player like a row of
+the entry list: name, gender, club, singles and doubles levels, and the events they play (only events that fit
+their gender). Each doubles event takes a partner: a player already in the tournament (if that partner was
+entered alone, the entry becomes the pair), a typed name for a partner who hasn't registered, or none (the entry
+waits for a partner, status "to confirm"). Entries are accepted straight away otherwise. Typing the name of
+someone already in the tournament adds the new entries to them instead of creating a duplicate. The per-event
+"Add entry" stays as it was.
+**Why:** Requested: manual entry for players.
+**Files:** `src/features/admin/entries/AddPlayerDialog.tsx` (+ test), `src/features/admin/entries/AdminEvents.tsx`,
+`src/data/store.ts` (`completePair`)
+**Checks:** `npm run check` passes (2130 tests). Headless Chrome: the form opens from Entries; no console errors.
+**Follow-up:** Not committed yet.
+
 ## 2026-10-17 — Demo seed anonymised
 
 **What:** The demo field keeps the Iowa Open 2026 shape (121 players, genders, levels, events and doubles pairings)
