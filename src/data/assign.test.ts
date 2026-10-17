@@ -57,9 +57,9 @@ describe('correcting a level given at registration', () => {
 
 describe('first-match scoring on a real draw', () => {
   // Iowa Open: one game to 30 for each player's first match, then best of 3 to 21.
-  // Men's singles is an ABCD drop flight with 42 players, so flight A has byes.
+  // Mixed doubles is an ABCD drop flight with an odd number of pairs, so flight A has a round-1 bye.
   const db = drawAll(buildIowaOpen(NOW), IOWA_OPEN_ID, 42);
-  const ms = db.events.find((e) => e.tournamentId === IOWA_OPEN_ID && e.kind === 'MS')!;
+  const ms = db.events.find((e) => e.tournamentId === IOWA_OPEN_ID && e.kind === 'XD')!;
   const stages = db.stages.filter((s) => s.eventId === ms.id);
   const flightA = stages.find((s) => s.flight === 'A')!;
   const ms_ = db.matches.filter((m) => m.eventId === ms.id);
@@ -77,11 +77,13 @@ describe('first-match scoring on a real draw', () => {
     expect(new Set(r1.map(rules))).toEqual(new Set(['ONE_30']));
   });
 
-  it('a player coming off a bye plays their first match to 30 in round 2; later rounds are best of 3', () => {
+  it('round 2: two bye holders play to 30, a bye holder against a round-1 winner plays full sets; later rounds are best of 3', () => {
     const r2 = ms_.filter((m) => m.stageId === flightA.id && m.round === 2);
-    const afterBye = r2.filter(fedByBye);
-    expect(afterBye.length).toBeGreaterThan(0);
-    expect(new Set(afterBye.map(rules))).toEqual(new Set(['ONE_30']));
+    const bothByes = r2.filter((m) => [m.srcA, m.srcB].every((s) => s.kind === 'winner' && isBye(s.matchId)));
+    const oneBye = r2.filter((m) => fedByBye(m) && !bothByes.includes(m));
+    expect(oneBye.length).toBeGreaterThan(0);
+    expect(new Set(oneBye.map(rules))).toEqual(new Set(['BWF_3x21']));
+    expect(new Set(bothByes.map(rules))).toEqual(new Set(bothByes.length ? ['ONE_30'] : []));
     const later = ms_.filter((m) => m.stageId === flightA.id && m.round >= 3);
     expect(later.length).toBeGreaterThan(0);
     expect(new Set(later.map(rules))).toEqual(new Set(['BWF_3x21']));

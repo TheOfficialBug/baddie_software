@@ -173,6 +173,117 @@ export function arrangeBalanced({ entryIds, seeds, levelOf, clubOf, pairing, ran
   return { size: S, lines, clubClashes, ranking };
 }
 
+/** C and D (and C/D pairs): the entries that should lose their way out of flight A in round 1. */
+export const isLowerLevel = (level: number) => level <= 2;
+
+/**
+ * Drop flight, flight A: C/D entries play A/B entries in round 1 wherever possible.
+ *   byes 'round1' (default): round 1 has the usual N − S/2 matches and the top of the ranking (A/B first) gets
+ *   the byes; the A/B entries left take the C/D entries, and any C/D entries beyond that meet each other.
+ *   byes 'round2': round 1 grows to one match per C/D entry (when there are more of them than N − S/2), fewer
+ *   top players get round-1 byes, and the draw takes the remaining byes in round 2 instead, split so that
+ *   round 2 is A v B where possible. Only when C/D entries outnumber A/B entries do some of them meet.
+ *   Nobody gets two byes. C/D v C/D matches are reported.
+ *   Pairing: the A/B entries in round 1 are the top half, the bottom half holds every C/D entry;
+ *   balanced pairs top[i] v bottom[i], classic top[i] v bottom[last − i].
+ * Lines are for a draw of 2 × (round-2 size); a round-1 pair of byes stands for a round-2 bye.
+ */
+export function arrangeDropFlight({
+  entryIds,
+  seeds,
+  levelOf,
+  clubOf,
+  pairing,
+  rand,
+}: ArrangeInput): Arrangement & { lowerClashes: number } {
+  const ranking = rankByLevel(entryIds, seeds, levelOf, rand);
+  const N = ranking.length;
+  if (N <= 2) return { size: 2, lines: [ranking[0], ranking[1] ?? 'BYE'], clubClashes: [], ranking, lowerClashes: 0 };
+  const rankOf = new Map(ranking.map((id, i) => [id, i]));
+  const byRank = (a: ID, b: ID) => rankOf.get(a)! - rankOf.get(b)!;
+  const lower = ranking.filter((id) => isLowerLevel(levelOf(id)));
+  const upper = ranking.filter((id) => !isLowerLevel(levelOf(id)));
+  const L = lower.length;
+
+  // round-1 matches: the usual N − S/2, or one per C/D entry when there are more of them
+  const m0 = N - nextPow2(N) / 2;
+  const m1 = Math.min(Math.floor(N / 2), Math.max(m0, L));
+  const field = [...upper, ...lower]; // A/B first, then C/D, each in rank order
+  const byeHolders = field.slice(0, N - 2 * m1);
+  const players = field.slice(byeHolders.length);
+  const top = players.slice(0, m1);
+  const bottom = players.slice(m1);
+  if (pairing === 'classic') bottom.reverse();
+
+  // clubmates apart: swap bottom-half partners, nearest first; keep C/D entries away from each other
+  const sameClub = (x: ID, y: ID) => !!clubOf(x) && clubOf(x) === clubOf(y);
+  const bothLower = (x: ID, y: ID) => isLowerLevel(levelOf(x)) && isLowerLevel(levelOf(y));
+  for (let i = 0; i < m1; i++) {
+    if (!sameClub(top[i], bottom[i])) continue;
+    const j = bottom
+      .map((_, k) => k)
+      .filter((k) => k !== i)
+      .sort((p, q) => Math.abs(p - i) - Math.abs(q - i))
+      .find(
+        (k) =>
+          !sameClub(top[i], bottom[k]) &&
+          !sameClub(top[k], bottom[i]) &&
+          (!bothLower(top[i], bottom[k]) || bothLower(top[i], bottom[i])) &&
+          (!bothLower(top[k], bottom[i]) || bothLower(top[k], bottom[k])),
+      );
+    if (j !== undefined) [bottom[i], bottom[j]] = [bottom[j], bottom[i]];
+  }
+  const lowerClashes = top.filter((t, i) => bothLower(t, bottom[i])).length;
+
+  // Round 2: units are round-1 bye holders and round-1 matches, by their best-ranked player.
+  type Unit = { anchor: ID; lines: [ID | 'BYE', ID | 'BYE'] };
+  const byeUnits: Unit[] = byeHolders.map((id) => ({ anchor: id, lines: [id, 'BYE'] }));
+  const matchUnits: Unit[] = top
+    .map((t, i) => [t, bottom[i]].sort(byRank) as [ID, ID])
+    .map(([a, b]): Unit => ({ anchor: a, lines: [a, b] }))
+    .sort((u, v) => byRank(u.anchor, v.anchor));
+  const W = byeUnits.length + matchUnits.length;
+  const S2 = nextPow2(W);
+  // Round-2 byes go to round-1 matches (never to someone who already had a bye). They're split between the
+  // top band (e.g. A players) and the rest so that those who play round 2 are half each: then the top band
+  // meets the rest (A v B) instead of the byes all going to the A players and the B players meeting each other.
+  // Within each band the best-ranked skip first.
+  const b2 = S2 - W;
+  const units = [...byeUnits, ...matchUnits];
+  const topLevel = Math.max(...units.map((u) => levelOf(u.anchor)));
+  const isTop = (u: Unit) => levelOf(u.anchor) > topLevel - 1;
+  const topM = matchUnits.filter(isTop);
+  const restM = matchUnits.filter((u) => !isTop(u));
+  const wanted = units.filter(isTop).length - (W - b2) / 2;
+  const x = Math.min(topM.length, b2, Math.max(0, b2 - restM.length, Math.round(wanted)));
+  const skip = [...topM.slice(0, x), ...restM.slice(0, b2 - x)];
+  // the rest play round 2, best-ranked against worst-ranked
+  const rest = units.filter((u) => !skip.includes(u)).sort((u, v) => byRank(u.anchor, v.anchor));
+  const empty: Unit = { anchor: '', lines: ['BYE', 'BYE'] };
+  const r2: [Unit, Unit][] = [
+    ...skip.map((u) => [u, empty] as [Unit, Unit]),
+    ...rest.slice(0, rest.length / 2).map((u, i) => [u, rest[rest.length - 1 - i]] as [Unit, Unit]),
+  ].sort((x, y) => byRank(x[0].anchor, y[0].anchor));
+
+  // round-2 matches on seed positions (tiers [1], [2], [3–4], [5–8]… drawn by lot)
+  const count = S2 / 2;
+  const lineOf = count === 1 ? [0] : seedLines(count);
+  const tiered: number[] = [];
+  for (let lo = 0; lo < count; lo += lo < 2 ? 1 : lo) tiered.push(...shuffle(lineOf.slice(lo, lo + (lo < 2 ? 1 : lo)), rand));
+  const lines: (ID | 'BYE')[] = new Array(2 * S2).fill('BYE');
+  r2.forEach(([a, b], k) => {
+    const at = 4 * tiered[k];
+    [lines[at], lines[at + 1], lines[at + 2], lines[at + 3]] = [...a.lines, ...b.lines];
+  });
+
+  const clubClashes: [ID, ID][] = [];
+  for (let l = 0; l < lines.length; l += 2) {
+    const [a, b] = [lines[l], lines[l + 1]];
+    if (a !== 'BYE' && b !== 'BYE' && sameClub(a, b)) clubClashes.push([a, b]);
+  }
+  return { size: 2 * S2, lines, clubClashes, ranking, lowerClashes };
+}
+
 /** Letter grade → number used for ranking (A strongest). */
 export const LEVEL_VALUE: Record<string, number> = { A: 4, B: 3, C: 2, D: 1 };
 

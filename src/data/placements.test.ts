@@ -3,13 +3,34 @@ import { describe, expect, it } from 'vitest';
 import type { EventKind } from '@/engine/types';
 
 import { saveResult } from '@/data/ops';
-import { drawPlaces, heldEntries, movedEntries, movesByes, rearrangeDraw, type Seating, seatingOf } from '@/data/placements';
+import {
+  addExtraLine,
+  drawPlaces,
+  extraBoxes,
+  heldEntries,
+  movedEntries,
+  movesByes,
+  rearrangeDraw,
+  type Seating,
+  seatingOf,
+} from '@/data/placements';
 import { buildIowaOpen, IOWA_OPEN_ID } from '@/data/seed/iowaOpen';
 import { drawAll } from '@/data/simulate';
 import type { DB } from '@/data/types';
 
 const NOW = Date.UTC(2026, 9, 17, 14, 0);
-const drawn = () => drawAll(buildIowaOpen(NOW), IOWA_OPEN_ID, 7);
+/** The seed is all drop flights; these tests also edit a round robin (WS) and a knockout (MD). */
+const withModes = (db: DB): DB => ({
+  ...db,
+  events: db.events.map((e) =>
+    e.kind === 'WS'
+      ? { ...e, mode: 'round_robin' as const, config: { ...e.config, groupSize: 4, advance: 2 as const } }
+      : e.kind === 'MD'
+        ? { ...e, mode: 'knockout' as const }
+        : e,
+  ),
+});
+const drawn = () => drawAll(withModes(buildIowaOpen(NOW)), IOWA_OPEN_ID, 7);
 const eventOf = (db: DB, kind: EventKind) => db.events.find((e) => e.tournamentId === IOWA_OPEN_ID && e.kind === kind)!;
 
 /** Swap the entries in two places of a seating. */
@@ -63,7 +84,8 @@ describe('rearranging a published draw', () => {
 
   it('moving a player off a bye sends the new occupant through instead', () => {
     const db = drawn();
-    const ms = eventOf(db, 'MS');
+    // mixed doubles: an odd number of pairs, so the top seed has a round-1 bye
+    const ms = eventOf(db, 'XD');
     const p = drawPlaces(db, ms.id);
     const byeLine = p.boxes.find((b) => b.places.some((x) => x.entryId === 'BYE'))!;
     const real = p.boxes.find((b) => b.title !== 'Bye' && b.places.every((x) => x.entryId !== 'BYE'))!;
@@ -151,7 +173,8 @@ describe('filling a bye before play starts', () => {
   };
   const numbersOf = (db: DB) => db.matches.filter((m) => m.number > 0).map((m) => m.number);
 
-  it.each(['MD', 'MS'] as const)('%s: the bye becomes a real match and the emptied place becomes a bye', (kind) => {
+  // XD: a drop flight with a round-1 bye (an odd number of pairs)
+  it.each(['MD', 'XD'] as const)('%s: the bye becomes a real match and the emptied place becomes a bye', (kind) => {
     const db = drawn();
     const { ev, real, byeLine, mover, holder, draft, original } = fillBye(db, kind);
     expect(movesByes(original, draft)).toBe(true);
@@ -175,7 +198,7 @@ describe('filling a bye before play starts', () => {
 
   it('drop flight: lower flights are rebuilt from the new real matches', () => {
     const db = drawn();
-    const { ev, draft } = fillBye(db, 'MS');
+    const { ev, draft } = fillBye(db, 'XD');
     const after = rearrangeDraw(db, ev.id, draft).db!;
     const ms = after.matches.filter((m) => m.eventId === ev.id);
     const byId = new Map(ms.map((m) => [m.id, m]));
@@ -196,5 +219,75 @@ describe('filling a bye before play starts', () => {
     const p = drawPlaces(db, md.id);
     expect(p.byesMovable).toBe(false);
     expect(Object.values(seatingOf(p)).every(Boolean)).toBe(true);
+  });
+});
+
+describe('By results: moving byes in placement round 1', () => {
+  const byResults = (db: DB): DB => ({
+    ...db,
+    events: db.events.map((e) => (e.kind === 'XD' ? { ...e, config: { ...e.config, variant: 'PLACEMENT' as const } } : e)),
+  });
+  const placed = () => drawAll(byResults(withModes(buildIowaOpen(NOW))), IOWA_OPEN_ID, 7);
+
+  it('moves the bye from the top seed to another player and rebuilds the placement rounds', () => {
+    const db = placed();
+    const ev = eventOf(db, 'XD');
+    const p = drawPlaces(db, ev.id);
+    const byeLine = p.boxes.find((b) => b.places.some((x) => x.entryId === 'BYE') && b.places.some((x) => x.entryId !== 'BYE'))!;
+    expect(byeLine).toBeDefined();
+    const real = p.boxes.find((b) => b.places.every((x) => x.entryId !== 'BYE'))!;
+    const seating = seatingOf(p);
+    const holder = byeLine.places.find((x) => x.entryId !== 'BYE')!;
+    const bye = byeLine.places.find((x) => x.entryId === 'BYE')!;
+    // the top seed plays instead: a real-line player takes the bye place, the other gets the bye
+    const mover = real.places[1];
+    const draft = { ...seating, [mover.key]: null, [bye.key]: seating[mover.key] };
+    const r = rearrangeDraw(db, ev.id, draft);
+    expect(r.error).toBeUndefined();
+    const ms = r.db!.matches.filter((m) => m.eventId === ev.id);
+    const line = ms.find((m) => m.id === byeLine.id)!;
+    expect([line.a, line.b].sort()).toEqual([holder.entryId, seating[mover.key]].sort());
+    expect(ms.find((m) => m.id === real.id)!.status).toBe('bye');
+    expect(r.db!.stages.filter((s) => s.eventId === ev.id).some((s) => s.placement)).toBe(true);
+  });
+
+  it('an added line gives a player a bye; their opponent gets one too', () => {
+    const db = placed();
+    const ev = eventOf(db, 'XD');
+    const p = drawPlaces(db, ev.id);
+    const seating = seatingOf(p);
+    const real = p.boxes.find((b) => b.places.every((x) => x.entryId !== 'BYE'))!;
+    const [mover, opp] = real.places.map((x) => seating[x.key]!);
+    const withLine = addExtraLine(ev.id, seating);
+    const [line] = extraBoxes(ev.id, withLine);
+    expect(line.title).toBe('New line 1');
+    const draft = { ...withLine, [real.places[0].key]: null, [line.places[0].key]: mover };
+    expect(movesByes(seating, draft)).toBe(true);
+    const r = rearrangeDraw(db, ev.id, draft);
+    expect(r.error).toBeUndefined();
+    const r1 = r.db!.matches.filter((m) => m.eventId === ev.id && m.stageId === `${ev.id}-R1`);
+    const byeOf = (e: string) => r1.find((m) => m.status === 'bye' && (m.a === e || m.b === e));
+    expect(byeOf(mover)).toBeDefined();
+    expect(byeOf(opp)).toBeDefined();
+    // everyone is still in the draw exactly once, and match numbers stay unique
+    const inR1 = r1.flatMap((m) => [m.a, m.b]).filter((x) => x && x !== 'BYE');
+    expect(new Set(inR1).size).toBe(inR1.length);
+    expect(inR1.length).toBe(Object.values(seating).filter(Boolean).length);
+    const nums = r.db!.matches.filter((m) => m.number > 0).map((m) => m.number);
+    expect(new Set(nums).size).toBe(nums.length);
+  });
+
+  it('an added line left empty changes nothing; added lines are refused outside placement rounds', () => {
+    const db = placed();
+    const ev = eventOf(db, 'XD');
+    const seating = seatingOf(drawPlaces(db, ev.id));
+    expect(rearrangeDraw(db, ev.id, addExtraLine(ev.id, seating)).db).toBe(db);
+    const md = eventOf(db, 'MD');
+    const mdSeat = seatingOf(drawPlaces(db, md.id));
+    const k = Object.keys(mdSeat).find((x) => mdSeat[x])!;
+    const withLine = addExtraLine(md.id, mdSeat);
+    const [line] = extraBoxes(md.id, withLine);
+    const r = rearrangeDraw(db, md.id, { ...withLine, [k]: null, [line.places[0].key]: mdSeat[k] });
+    expect(r.error).toMatch(/placement rounds/);
   });
 });

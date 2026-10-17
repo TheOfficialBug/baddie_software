@@ -5,7 +5,9 @@
 //   • Before any match of the event is played, bye places can be filled too (a bye becomes a real
 //     match and the emptied place becomes a bye). The draw's structure is then rebuilt from the new
 //     first-round lines, keeping match numbers inside the event's range where they fit.
+//   • In placement rounds (drop flight by results) lines can be added too, to give someone a bye.
 import { generateDraw } from '@/engine/draws';
+import { LEVEL_VALUE } from '@/engine/pairing';
 import { assignNumbers, resolveMatches } from '@/engine/progression';
 import { groupRulesId, RULES } from '@/engine/rules';
 import type { ID, Match, SlotSource } from '@/engine/types';
@@ -81,6 +83,39 @@ export function drawPlaces(db: DB, eventId: ID): DrawPlaces {
 /** Who sits where: place key → entry, or null for an empty place (a bye if left empty). */
 export type Seating = Record<string, ID | null>;
 
+// Lines added in the editor (drop flight by results: a way to give someone a placement-round bye).
+// Their places live in the seating as `${eventId}-extra${n}:a` / `:b`.
+const extraLine = (eventId: ID, key: string) => {
+  const m = key.match(/^(.*)-extra(\d+):[ab]$/);
+  return m && m[1] === eventId ? Number(m[2]) : null;
+};
+
+/** Lines added in the editor, in the order they were added. */
+export function extraBoxes(eventId: ID, seating: Seating): PlaceBox[] {
+  const ns = [...new Set(Object.keys(seating).flatMap((k) => extraLine(eventId, k) ?? []))].sort((a, b) => a - b);
+  return ns.map((n, i) => ({
+    id: `${eventId}-extra${n}`,
+    kind: 'line',
+    title: `New line ${i + 1}`,
+    places: (['a', 'b'] as const).map((side) => ({ key: `${eventId}-extra${n}:${side}`, entryId: 'BYE' })),
+  }));
+}
+
+/** The seating with one more empty line: a player put there gets a bye. */
+export function addExtraLine(eventId: ID, seating: Seating): Seating {
+  const used = Object.keys(seating).flatMap((k) => extraLine(eventId, k) ?? []);
+  const n = used.length ? Math.max(...used) + 1 : 1;
+  return { ...seating, [`${eventId}-extra${n}:a`]: null, [`${eventId}-extra${n}:b`]: null };
+}
+
+/** The seating without an added line (only when nobody is in it). */
+export function removeExtraLine(seating: Seating, box: PlaceBox): Seating {
+  if (box.places.some((p) => seating[p.key])) return seating;
+  const next = { ...seating };
+  for (const p of box.places) delete next[p.key];
+  return next;
+}
+
 /** The editable places and who is in them. Bye places are included (empty) only while byes can move. */
 export function seatingOf(p: DrawPlaces): Seating {
   return Object.fromEntries(
@@ -117,8 +152,11 @@ export function rearrangeDraw(db: DB, eventId: ID, draft: Seating): OpResult {
   const original = seatingOf(p);
   const keys = Object.keys(original);
   if (heldEntries(original, draft).length) return { error: 'Place everyone from the holding area first.' };
-  const placed = keys.map((k) => draft[k]).filter(Boolean);
+  const placed = Object.values(draft).filter(Boolean);
   if (new Set(placed).size !== placed.length) return { error: 'Each player can only be in one place.' };
+  const extras = extraBoxes(eventId, draft).filter((b) => b.places.some((x) => draft[x.key]));
+  if (extras.length && !db.stages.some((s) => s.eventId === eventId && s.placement))
+    return { error: 'New lines can only be added to placement rounds.' };
   const changed = keys.filter((k) => draft[k] !== original[k]);
   if (changed.some((k) => [original[k], draft[k]].some((e) => e && p.locked.has(e))))
     return { error: 'Players who have already played stay where they are.' };
@@ -162,15 +200,27 @@ function rebuildFromLines(db: DB, eventId: ID, draft: Seating): OpResult {
   if (!ev || !t || !start || ev.mode === 'round_robin') return { error: 'This draw has no byes to move.' };
   const r1 = db.matches.filter((m) => m.stageId === start.id && m.round === 1).sort((a, b) => a.index - b.index);
   const lines = r1.flatMap((m) => [draft[`${m.id}:a`] ?? 'BYE', draft[`${m.id}:b`] ?? 'BYE']);
+  const extraLines = extraBoxes(eventId, draft).flatMap((b) => b.places.map((x) => draft[x.key] ?? ('BYE' as const)));
+  const all = [...lines, ...extraLines];
   const playersOf = (id: ID) =>
     (db.entries.find((e) => e.id === id)?.playerIds ?? []).flatMap((pid) => db.players.find((x) => x.id === pid) ?? []);
+  // levels for this event (as on the setup screen), so a drop flight routes its losers by level again
+  const levelOf = (id: ID) => {
+    const e = db.entries.find((x) => x.id === id);
+    if (!e) return 0;
+    const levels = [...(e.levels ?? e.playerIds.map((pid) => db.players.find((x) => x.id === pid)?.level ?? 'C'))];
+    if (e.pendingPartner) levels.push(e.pendingPartner.level);
+    return levels.reduce((sum, l) => sum + LEVEL_VALUE[l], 0) / Math.max(1, levels.length);
+  };
   const plan = generateDraw({
     event: ev,
-    entryIds: lines.filter((x): x is ID => x !== 'BYE'),
+    entryIds: all.filter((x): x is ID => x !== 'BYE'),
     seeds: 0,
     rngSeed: ev.drawSeed ?? 1,
     clubOf: (id) => entryClub(playersOf(id)),
+    levelOf,
     lines,
+    extraLines,
   });
   const resolved = resolveMatches(plan.matches, { groups: plan.groups, rulesFor: () => RULES[groupRulesId(ev)] });
   const count = assignNumbers(resolved, plan.stages, plan.groups, 0).next;

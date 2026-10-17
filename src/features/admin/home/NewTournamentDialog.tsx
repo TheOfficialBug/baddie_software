@@ -92,7 +92,7 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
         cap: 32,
         rules,
         mode: e.mode,
-        config: { groupSize: 4, advance: 2, variant: 'PLACEMENT', thirdPlace: false, plate: false, seeds: 0, firstRound },
+        config: { groupSize: 4, advance: 2, variant: 'ABCD', thirdPlace: false, plate: false, seeds: 0, firstRound },
         drawState: 'none',
       })),
     );

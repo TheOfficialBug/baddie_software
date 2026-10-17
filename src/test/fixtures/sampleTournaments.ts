@@ -404,16 +404,18 @@ export function buildSampleData(now = Date.now()): DB {
   db = progress(db, t3.id, 1, summerEnd, rand, strength, 0);
 
   // ---------- organization, staff and demo accounts ----------
-  const linked = new Map(DEMO_ACCOUNTS.filter((a) => a.playerId).map((a) => [a.playerId!, a]));
+  // the demo player account is linked to this fixture's own player (the seed links it to a real entrant)
+  const accounts = DEMO_ACCOUNTS.map((a) => (a.playerId ? { ...a, playerId: 'p-M5' } : a));
+  const linked = new Map(accounts.filter((a) => a.playerId).map((a) => [a.playerId!, a]));
   db = {
     ...db,
     organizations: [{ ...DEMO_ORG }],
-    profiles: DEMO_ACCOUNTS.map((a) => ({
+    profiles: accounts.map((a) => ({
       id: a.id,
       email: a.email,
       name: a.playerId ? (db.players.find((p) => p.id === a.playerId)?.name ?? a.name) : a.name,
     })),
-    members: DEMO_ACCOUNTS.filter((a) => a.role).map((a) => ({ orgId: DEMO_ORG.id, userId: a.id, role: a.role! })),
+    members: accounts.filter((a) => a.role).map((a) => ({ orgId: DEMO_ORG.id, userId: a.id, role: a.role! })),
     orgInvites: [],
     players: db.players.map((p) => (linked.has(p.id) ? { ...p, userId: linked.get(p.id)!.id, email: linked.get(p.id)!.email } : p)),
   };

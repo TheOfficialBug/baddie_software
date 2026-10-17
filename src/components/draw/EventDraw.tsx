@@ -16,7 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 
 /** Where each tab's players come from, per drop flight variant (keyed by flight, or by stage name). */
 const FROM: Record<string, Record<string, string>> = {
-  ABCD: { A: 'Everyone starts here', B: 'Lost in A round 2', C: 'Lost in A round 1', D: 'Lost in C round 1' },
+  ABCD: { A: 'Everyone starts here', B: 'Won, then lost in A', C: 'Lost their first match in A', D: 'Lost their first match in C' },
   AB: { A: 'Everyone starts here', B: 'Lost in A round 1' },
   PLACEMENT: {
     A: 'Won round 2 upper',
@@ -26,7 +26,7 @@ const FROM: Record<string, Record<string, string>> = {
   },
 };
 const HOW: Record<string, string> = {
-  ABCD: 'Everyone starts in Flight A. Lose in A round 1 → Flight C. Lose in A round 2 → Flight B. Lose in C round 1 → Flight D. Every flight crowns its own champion.',
+  ABCD: 'Everyone starts in Flight A. Your first two matches decide your flight: win, win → stay in A · win, lose → Flight B · lose, win → Flight C · lose, lose → Flight D. With a round-1 bye your first match is in round 2. The draw is arranged so players finish in the flight of their level. Every flight crowns its own champion.',
   AB: 'Everyone starts in Flight A. Lose in A round 1 and you drop to Flight B, so everyone plays at least twice.',
   PLACEMENT:
     'Two placement rounds sort everyone into a flight by results. Round 1: the top half of the field plays the bottom half; winners go to the upper group, losers to the lower group. Round 2: each group plays again; upper winners → Flight A, upper losers → Flight B, lower winners → Flight C, lower losers → Flight D. Each flight is then a knockout with its own champion. The draw is fixed when published.',
