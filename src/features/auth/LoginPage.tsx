@@ -133,6 +133,15 @@ export function LoginPage() {
         className="mb-5"
       />
 
+      {mode === 'signup' && (
+        <p className="-mt-2 mb-4 text-[14px] text-muted">
+          Here to play? Player accounts are opening soon:{' '}
+          <Link to="/waitlist" className="font-semibold text-fg underline underline-offset-4">
+            join the waitlist
+          </Link>
+          .
+        </p>
+      )}
       {error && <FormError>{error}</FormError>}
 
       {backend?.googleEnabled && (

@@ -38,6 +38,7 @@ export const routes: RouteObject[] = [
         errorElement: <RouteError />,
         children: [
           { index: true, lazy: () => import('@/features/public/home/Home').then((m) => ({ Component: m.Home })) },
+          { path: 'waitlist', lazy: () => import('@/features/public/waitlist/Waitlist').then((m) => ({ Component: m.Waitlist })) },
           {
             element: <RequireAuth />,
             children: [
@@ -82,6 +83,10 @@ export const routes: RouteObject[] = [
             children: [
               { index: true, lazy: () => import('@/features/admin/home/AdminHome').then((m) => ({ Component: m.AdminHome })) },
               { path: 'team', lazy: () => import('@/features/admin/team/TeamPage').then((m) => ({ Component: m.TeamPage })) },
+              {
+                path: 'waitlist',
+                lazy: () => import('@/features/admin/team/WaitlistPage').then((m) => ({ Component: m.WaitlistPage })),
+              },
               {
                 path: 't/:tid',
                 ...needs('run_match_day'),

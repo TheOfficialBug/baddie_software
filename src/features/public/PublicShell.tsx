@@ -37,7 +37,7 @@ export function PublicShell() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky z-40 border-b border-line bg-bg/90 backdrop-blur-md" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="mx-auto flex h-16 max-w-[1240px] items-center gap-6 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-[1240px] items-center gap-2 px-4 sm:gap-6 sm:px-6">
           <div className="flex items-center gap-1">
             {!isHomePath(pathname) && <BackButton className="-ml-2" />}
             <Logo />
@@ -60,10 +60,14 @@ export function PublicShell() {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-1">
-            <HelpButton />
+            {/* phones: help moves off the bar when the back button needs the room */}
+            <span className={cn(!isHomePath(pathname) && 'hidden sm:inline-flex')}>
+              <HelpButton />
+            </span>
             <NoticeBell />
             <ThemeToggle className="ml-1 hidden lg:inline-flex" />
-            <span className="lg:hidden">
+            {/* phones follow the system theme; the switch needs the room for Sign in */}
+            <span className="hidden sm:inline-flex lg:hidden">
               <ThemeSwitchButton />
             </span>
             <AccountMenu className="ml-1" />

@@ -10,6 +10,8 @@ import { fmtDate, fmtDateRange } from '@/lib/format';
 import { type Lookup, useLookup } from '@/data/lookup';
 import { registrationOpen } from '@/data/registration';
 
+import { useAccess } from '@/auth/useAccess';
+
 import { EventChip, LiveDot, Pill } from '@/components/tournament/Badges';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -20,6 +22,7 @@ import { SectionHead } from '@/components/ui/Section';
 export function Home() {
   useDocumentTitle('Badminton tournaments');
   const lk = useLookup();
+  const access = useAccess();
   const [q, setQ] = useState('');
   const match = (t: Tournament) => !q.trim() || `${t.name} ${t.city} ${t.venue}`.toLowerCase().includes(q.trim().toLowerCase());
   const live = lk.tournaments.filter((t) => t.status === 'live' && match(t));
@@ -41,15 +44,16 @@ export function Home() {
       icon: 'userAdd',
       title: 'Register to play',
       body: 'Pick your events, add a doubles partner and pay in one go.',
-      to: firstOpen ? `/t/${firstOpen.slug}/register` : '/',
-      cta: firstOpen ? 'Find an event' : 'Registration is closed',
+      to: firstOpen ? `/t/${firstOpen.slug}/register` : '/waitlist',
+      cta: firstOpen ? 'Find an event' : 'Join the waitlist',
     },
     {
       icon: 'whistle',
       title: 'Run a tournament',
       body: 'Entries, draws, courts and score slips, all from one desk.',
-      to: '/admin',
-      cta: 'Open the organizer desk',
+      // staff go to the desk; everyone else can ask for organizer access
+      to: access.isOrganizer ? '/admin' : '/waitlist?as=organizer',
+      cta: access.isOrganizer ? 'Open the organizer desk' : 'Get organizer access',
     },
   ];
 
@@ -110,7 +114,7 @@ export function Home() {
       )}
       {open.length > 0 && (
         <section>
-          <SectionHead title="Registration open" />
+          <SectionHead title="Coming up" />
           <div className="grid gap-4 lg:grid-cols-2">
             {open.map((t) => (
               <TournamentCard key={t.id} lk={lk} t={t} />
@@ -167,12 +171,12 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
               <LiveDot /> Live · {onCourt} on court
             </Pill>
           )}
-          {t.status === 'registration' && (
+          {registrationOpen(t) && (
             <Pill tone="info" className="mb-1 self-start">
               Registration closes {fmtDate(t.regCloses ?? t.startDate, { month: 'short', day: 'numeric' })}
             </Pill>
           )}
-          {t.status === 'closed' && (
+          {(t.status === 'closed' || (t.status === 'registration' && !registrationOpen(t))) && (
             <Pill tone="muted" className="mb-1 self-start">
               Registration closed · draws coming soon
             </Pill>

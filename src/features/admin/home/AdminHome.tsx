@@ -58,6 +58,9 @@ export function AdminHome() {
         description="Set up events, confirm entries, make the draws and run match day, all from here."
         actions={
           <>
+            <ButtonLink to="/admin/waitlist" icon={<Icon name="userAdd" size={18} />}>
+              Waitlist
+            </ButtonLink>
             <ButtonLink to="/admin/team" icon={<Icon name="users" size={18} />}>
               Team
             </ButtonLink>

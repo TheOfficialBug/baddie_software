@@ -202,3 +202,18 @@ describe('team management', () => {
     expect(await as('scorer', async () => (await db.query<{ r: string }>(`select public.app_role() r`)).rows[0].r)).toBe('admin');
   });
 });
+
+describe('waitlist', () => {
+  it('anyone can join, a second sign-up is ignored, only staff read the list', async () => {
+    await as('anon', () => db.query(`select public.join_waitlist('Ada', 'Ada@Example.com', 'player', 'ISU', 'Ames', 'home')`));
+    await as('anon', () => db.query(`select public.join_waitlist('Ada again', 'ada@example.com')`));
+    await rejects(() => as('anon', () => db.query(`select public.join_waitlist('Bad', 'not-an-email')`)), /check constraint/);
+    await rejects(() => as('anon', () => db.query(`select * from public.waitlist`)), /permission denied/);
+    await as('player', async () => expect((await db.query(`select * from public.waitlist`)).rows).toHaveLength(0));
+    const rows = await as(
+      'owner',
+      async () => (await db.query<{ name: string; email: string }>(`select name, email from public.waitlist`)).rows,
+    );
+    expect(rows).toEqual([{ name: 'Ada', email: 'ada@example.com' }]);
+  });
+});

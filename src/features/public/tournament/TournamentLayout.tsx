@@ -59,15 +59,20 @@ export function TournamentLayout() {
     <div className="flex min-h-dvh flex-col">
       <header className="hero" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="mx-auto flex max-w-[1240px] flex-col gap-5 px-4 pt-4 sm:gap-6 sm:px-6 sm:pt-5 lg:px-10">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
               <BackButton tone="hero" />
               <Logo tone="hero" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <HelpButton tone="hero" />
+            <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              {/* phones keep the bell and account; help and theme (which follows the system) need the room */}
+              <span className="hidden sm:inline-flex">
+                <HelpButton tone="hero" />
+              </span>
               <NoticeBell tone="hero" tournamentId={t.id} />
-              <ThemeSwitchButton tone="hero" />
+              <span className="hidden sm:inline-flex">
+                <ThemeSwitchButton tone="hero" />
+              </span>
               <AccountMenu tone="hero" />
               {registrationOpen(t) && (
                 <ButtonLink to={`${base}/register`} variant="primary" className="ml-1 hidden sm:inline-flex">
