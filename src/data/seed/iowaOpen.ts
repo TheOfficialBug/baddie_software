@@ -1,6 +1,6 @@
-// Starting data: "Iowa Open Test 26", built from the real Iowa Open 2026 player list (Badminton Club at
-// Iowa State, Ames, Oct 17–18): 121 players and their entries in the five Open events (see iowaOpenEntries,
-// generated from the tournamentsoftware.com export). Every event is a drop flight.
+// Starting data: "Iowa Open Test 26", modelled on the Iowa Open 2026 field (Badminton Club at Iowa State, Ames,
+// Oct 17–18): 121 players and their entries in the five Open events, with invented names and clubs (see
+// iowaOpenEntries). Every event is a drop flight. Load the real entry list with Entries → Import.
 import { DEMO_ACCOUNTS, DEMO_ORG } from '@/config/demo';
 import { mulberry32 } from '@/engine/rng';
 import type { Entry, EventKind, Player, SkillLevel, TEvent, Tournament } from '@/engine/types';

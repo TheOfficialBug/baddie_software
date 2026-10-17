@@ -254,7 +254,7 @@ export function SeedingList({
             value={pasted}
             onChange={(e) => setPasted(e.target.value)}
             rows={6}
-            placeholder={'1\tJason Ung\tA\n2\tPetro Takalo\tA\n…'}
+            placeholder={'1\tAlex Kim\tA\n2\tSam Rao\tA\n…'}
             className="num w-full rounded-xl border border-line bg-surface p-2.5 text-[13px] outline-none focus:border-accent"
           />
           {pastePlan && (

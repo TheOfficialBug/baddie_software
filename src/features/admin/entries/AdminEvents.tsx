@@ -18,6 +18,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FilterChips } from '@/components/ui/Tabs';
 
+import { AddPlayerDialog } from '@/features/admin/entries/AddPlayerDialog';
 import { downloadEntryList } from '@/features/admin/entries/entryListFile';
 import { EventDialog } from '@/features/admin/entries/EventDialog';
 import { EventEntries } from '@/features/admin/entries/EventEntries';
@@ -31,6 +32,7 @@ export function AdminEvents() {
   const [sel, setSel] = usePersistentState<string | undefined>(t ? `entries.event:${t.id}` : null, events[0]?.id);
   const [editing, setEditing] = useState<TEvent | 'new' | null>(null);
   const [importing, setImporting] = useState(false);
+  const [addingPlayer, setAddingPlayer] = useState(false);
   if (!t) return <NotFound what="tournament" />;
   const ev = lk.event(sel) ?? events[0];
   const pendingOf = (e: TEvent) => lk.entriesOf(e.id).filter((x) => x.status === 'pending').length;
@@ -45,6 +47,9 @@ export function AdminEvents() {
           <>
             {events.length > 0 && (
               <>
+                <Button icon={<Icon name="user" size={18} />} onClick={() => setAddingPlayer(true)}>
+                  Add player
+                </Button>
                 <Button icon={<Icon name="upload" size={18} />} onClick={() => setImporting(true)}>
                   Import
                 </Button>
@@ -133,6 +138,7 @@ export function AdminEvents() {
         </div>
       )}
       {importing && <ImportEntriesDialog t={t} onClose={() => setImporting(false)} />}
+      {addingPlayer && <AddPlayerDialog lk={lk} t={t} onClose={() => setAddingPlayer(false)} />}
       {editing && (
         <EventDialog
           t={t}

@@ -17,6 +17,33 @@ Template:
 
 ---
 
+## 2026-10-17 — Add a player by hand
+
+**What:** The Entries page has an **Add player** button (next to Import). One form enters a player like a row of
+the entry list: name, gender, club, singles and doubles levels, and the events they play (only events that fit
+their gender). Each doubles event takes a partner: a player already in the tournament (if that partner was
+entered alone, the entry becomes the pair), a typed name for a partner who hasn't registered, or none (the entry
+waits for a partner, status "to confirm"). Entries are accepted straight away otherwise. Typing the name of
+someone already in the tournament adds the new entries to them instead of creating a duplicate. The per-event
+"Add entry" stays as it was.
+**Why:** Requested: manual entry for players.
+**Files:** `src/features/admin/entries/AddPlayerDialog.tsx` (+ test), `src/features/admin/entries/AdminEvents.tsx`,
+`src/data/store.ts` (`completePair`)
+**Checks:** `npm run check` passes (2130 tests). Headless Chrome: the form opens from Entries; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-17 — Demo seed anonymised
+
+**What:** The demo field keeps the Iowa Open 2026 shape (121 players, genders, levels, events and doubles pairings)
+but with invented names and clubs; players of one real club share one invented club, so club separation behaves
+the same. Real names were also taken out of the worklog and a seeding-list placeholder. The real entry list is
+loaded in the app with Entries → Import (the tournamentsoftware.com .xlsx export) and stays in that browser.
+**Why:** Requested: hide the real player list from GitHub.
+**Files:** `src/data/seed/iowaOpenEntries.ts`, `src/data/seed/iowaOpen.ts`, `src/features/admin/draws/SeedingList.tsx`,
+`docs/WORKLOG.md`
+**Checks:** `npm run check` passes (2128 tests); a scan for every name on the list finds none from this work.
+**Follow-up:** Folded into the earlier commit and force-pushed so the real names leave the branch on GitHub.
+
 ## 2026-10-16 — Clubs column on brackets (can be switched off)
 
 **What:** Brackets have a **Clubs** button in their controls (next to zoom and Fit). When on, a column left of
@@ -201,7 +228,7 @@ Only before any match in the event is played, and only for placement rounds.
 **Why:** Requested: organizers want to move the byes in the placement round themselves (e.g. when the draw gives none).
 **Files:** `src/features/admin/draws/DrawEditor.tsx`, `src/data/placements.ts`, `src/engine/draws.ts`, `src/data/placements.test.ts`
 **Checks:** `npm run check` passes (2121 tests). Headless Chrome on the demo Men's Singles by results (no round-1
-byes): added a line, moved Mathew Paramben into it, published; he and his opponent Cheng Liang Chang got round-1
+byes): added a line, moved a player into it, published; that player and the opponent they left got round-1
 byes and went straight into round 2 upper; no console errors.
 **Follow-up:** Not committed yet. Later rounds don't preview in the editor while added lines are in use (they update on publish).
 
@@ -245,7 +272,7 @@ A/B/C/D drop flight. Singles use Level1, doubles Level2. Doubles partners were m
 names (84 mutual pairs, the rest one-way); 2 MD entries name a partner who isn't on the list (pending partner),
 and 9 doubles entries with no partner given wait for the organizer (status pending). Birth dates and home towns
 were left out (birth year = tournament year − 25, as the entry-list import does). The demo Player account is
-linked to Kiara Sta Maria (p-28).
+linked to player p-28.
 **Why:** Requested: import the real player list into the seed data, with drop flight as the default event type.
 **Files:** `src/data/seed/iowaOpenEntries.ts` (generated), `src/data/seed/iowaOpen.ts`, `src/config/demo.ts`,
 `src/test/fixtures/sampleTournaments.ts`, `src/data/simulate.test.ts`, `src/data/placements.test.ts`,
@@ -253,8 +280,7 @@ linked to Kiara Sta Maria (p-28).
 **Checks:** `npm run check` passes (2062 tests). Drawn from the seed, every event has more C/D than A/B entries,
 so each draw has a few C/D v C/D round-1 matches (MS 5, WS 5, MD 6, WD 4, XD 6) and says so.
 **Follow-up:** Not committed yet. Saved browser data keeps the old demo until Settings → Reset demo data.
-The repo now contains real entrants' names and clubs (the old seed deliberately used invented names); check
-before publishing the demo anywhere public.
+The repo keeps only invented names and clubs (see the later entry); the real list is loaded with Entries → Import.
 
 ## 2026-10-16 — Bracket line through a round-2 bye
 
@@ -536,9 +562,7 @@ same layout as .xlsx, so it can be edited in Excel and imported again.
 tests `src/lib/xlsx.test.ts`, `src/data/entryList.test.ts`, `ImportEntriesDialog.test.tsx`.
 **Checks:** New tests pass (20). Tried against the real file: all 121 players read, 178 entries + 2 withdrawn,
 export → re-import changes nothing.
-**Follow-up:** Not committed yet. On the real list, check: Kent Sta Maria (XD names Kasia Klapacz, who is paired
-with Mathew Paramben), Billy Dang (MD names "Lucas Chen", paired with Ssu Tsan Chang), Satya Kosaraju's MD partner
-"Shunquin" (Shun Quinlan is female), and 9 doubles entries with no partner given.
+**Follow-up:** Not committed yet. On the real list, check the few doubles pairs matched from one-way partner names, a partner typed with the wrong gender, and the doubles entries with no partner given.
 
 ## 2026-10-13 — Score slip shows the right number of games
 
