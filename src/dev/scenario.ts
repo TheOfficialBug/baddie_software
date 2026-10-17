@@ -1,16 +1,15 @@
-// Dev-only match-day scenario from a real tournamentsoftware draws file (`npm run dev:scenario`): four
-// categories in four formats, every match through the semi-finals played, finals on court. The draws file
-// stays on this machine (local/*.draws.json, git-ignored); nothing here ships in a build.
+// Dev-only scenarios from a real tournamentsoftware draws file kept in local/ (git-ignored): every category
+// as an A/B/C/D drop flight (tournamentsoftware's Triple Plate) with the site's first round.
+//   dev:organizer – in draft, nothing played, for running the tournament from the desk;
+//   dev:scenario  – a match day in progress (everything through the semi-finals played, finals on court).
+// Nothing here ships in a build.
 import { DEMO_ORG } from '@/config/demo';
-import { generateDraw } from '@/engine/draws';
 import { mulberry32 } from '@/engine/rng';
-import type { ID, Match, TEvent } from '@/engine/types';
+import type { ID, Match } from '@/engine/types';
 
 import { addDaysISO, todayISO } from '@/lib/format';
 
-import { BASE_EVENT_CONFIG } from '@/data/catalog';
-import { entryClub } from '@/data/clubs';
-import { adjustLive, callToCourt, clearDraw, publishPlan, resolveTournament, rulesOfMatch, saveResult, uid } from '@/data/ops';
+import { adjustLive, callToCourt, resolveTournament, rulesOfMatch, saveResult, uid } from '@/data/ops';
 import { buildIowaOpen } from '@/data/seed/iowaOpen';
 import { simulateResult } from '@/data/simulate';
 import { importTsDraws, type TsDrawFile } from '@/data/tsDraws';
@@ -18,9 +17,8 @@ import type { DB } from '@/data/types';
 
 export const SCENARIO_SLUG = 'iowa-open-2026';
 
-/** Every category as tournamentsoftware runs it: elimination with a Triple Plate (A/B/C/D flights), first round as drawn. */
-const TS_FLIGHTS = { mode: 'drop_flight' as const, config: { variant: 'ABCD' as const, layout: 'tournamentsoftware' as const } };
-const KINDS = new Set(['MS', 'WS', 'MD', 'WD']);
+// every category on the site (Mixed Doubles included)
+const KINDS = new Set(['MS', 'WS', 'MD', 'WD', 'XD']);
 
 const isFinal = (db: DB, m: Match) => {
   const st = db.stages.find((s) => s.id === m.stageId);
@@ -68,40 +66,15 @@ export function buildDraws(file: TsDrawFile, now = Date.now(), seed = 26): DB {
     about: 'Iowa Open 2026, run on Smashboard with the draws from tournamentsoftware.',
   });
 
-  const four = { ...file, events: file.events.filter((e) => KINDS.has(e.kind)) };
-  const r = importTsDraws(db, tid, four, now);
+  const events = { ...file, events: file.events.filter((e) => KINDS.has(e.kind)) };
+  const r = importTsDraws(db, tid, events, now);
   if (!r.db) throw new Error(r.error ?? 'Import failed');
   db = r.db;
   // a hidden playing strength per player, so results look like real badminton rather than coin flips
   db = { ...db, players: db.players.map((p) => ({ ...p, strength: Math.round((2 + rand() * 7) * 10) / 10 })) };
 
-  // lay every category out as tournamentsoftware's Triple Plate, keeping its first round
-  for (const ev of db.events.filter((e) => e.tournamentId === tid)) {
-    const r1 = db.matches
-      .filter((m) => m.eventId === ev.id && m.round === 1 && db.stages.find((s) => s.id === m.stageId)?.order === 0)
-      .sort((a, b) => a.index - b.index);
-    const lines = r1.flatMap((m) => [m.srcA, m.srcB]).map((s) => (s.kind === 'entry' ? s.entryId : 'BYE')) as (ID | 'BYE')[];
-    const next: TEvent = {
-      ...ev,
-      name: `${ev.name}`,
-      mode: TS_FLIGHTS.mode,
-      config: { ...BASE_EVENT_CONFIG, ...ev.config, ...TS_FLIGHTS.config },
-    };
-    db = clearDraw(db, ev.id);
-    db = { ...db, events: db.events.map((e) => (e.id === ev.id ? next : e)) };
-    const entryIds = db.entries.filter((e) => e.eventId === ev.id).map((e) => e.id);
-    const playerOf = new Map(db.players.map((p) => [p.id, p]));
-    const clubOf = (id: ID) => entryClub((db.entries.find((e) => e.id === id)?.playerIds ?? []).flatMap((p) => playerOf.get(p) ?? []));
-    const plan = generateDraw({
-      event: next,
-      entryIds,
-      seeds: 0,
-      rngSeed: seed,
-      clubOf,
-      ...(lines.length ? { lines } : {}),
-    });
-    db = publishPlan(db, ev.id, plan, seed);
-  }
+  // the importer lays every category out as tournamentsoftware's Triple Plate, keeping its first round and
+  // numbering matches 1, 2, 3… like the score slips
   return resolveTournament(db, tid);
 }
 
@@ -197,7 +170,10 @@ async function loadDrawsFile() {
 
 const isOurs = (db: DB, status: (s: string) => boolean) =>
   db.tournaments.some((t) => t.slug === SCENARIO_SLUG && status(t.status)) &&
-  db.events.some((e) => e.config.layout === 'tournamentsoftware');
+  db.events.some((e) => e.config.layout === 'tournamentsoftware') &&
+  // saved before Mixed Doubles was included, or numbered from 304 by an older version: start again
+  db.events.some((e) => e.kind === 'XD') &&
+  db.matches.some((m) => m.number === 1);
 
 /** `npm run dev:scenario`: a match day in progress on the real draws, kept moving. */
 export async function startScenario(): Promise<void> {
