@@ -20,11 +20,14 @@ export function DrawCanvas({
   label,
   className,
   toolbar,
+  controls,
 }: {
   children: ReactNode;
   label: string;
   className?: string;
   toolbar?: ReactNode;
+  /** Extra buttons at the start of the zoom controls (e.g. the bracket's "Clubs" switch). */
+  controls?: ReactNode;
 }) {
   const [full, setFull] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -109,6 +112,7 @@ export function DrawCanvas({
       {toolbar && <div className="shrink-0 border-b border-line">{toolbar}</div>}
       <div className="relative min-h-0 flex-1">
         <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface/95 p-0.5 shadow-sm backdrop-blur">
+          {controls}
           <button type="button" aria-label="Zoom out" onClick={() => zoomAt(zoom - 0.15)} className={zoomBtn}>
             <Icon name="minus" size={15} />
           </button>

@@ -11,16 +11,17 @@ const NOW = Date.UTC(2026, 9, 17, 14, 0);
 describe('Iowa Open Test 26 seed', () => {
   const db = buildIowaOpen(NOW);
 
-  it('mirrors the real event sizes: 120 entries from 114 players', () => {
+  it('holds the real 2026 field: 178 entries from 121 players, every event a drop flight', () => {
     expect(db.tournaments.map((t) => [t.name, t.status])).toEqual([['Iowa Open Test 26', 'registration']]);
-    expect(db.players).toHaveLength(114);
+    expect(db.players).toHaveLength(121);
     const count = (kind: string) => db.entries.filter((e) => e.eventId === `${IOWA_OPEN_ID}-${kind}`).length;
-    expect([count('MS'), count('WS'), count('MD'), count('WD'), count('XD')]).toEqual([42, 25, 16, 11, 26]);
-    expect(db.entries).toHaveLength(120);
+    expect([count('MS'), count('WS'), count('MD'), count('WD'), count('XD')]).toEqual([48, 24, 35, 21, 50]);
+    expect(db.entries).toHaveLength(178);
+    expect(db.events.every((e) => e.mode === 'drop_flight' && e.config.variant === 'ABCD')).toBe(true);
     expect(db.matches).toHaveLength(0);
   });
 
-  it('has valid entries: right genders, nobody twice in an event, a few waiting to be confirmed', () => {
+  it('has valid entries: right genders, nobody twice in an event, unpartnered doubles waiting', () => {
     const p = new Map(db.players.map((x) => [x.id, x]));
     for (const e of db.entries) {
       const kind = e.eventId.split('-').at(-1)!;
@@ -28,19 +29,23 @@ describe('Iowa Open Test 26 seed', () => {
         .map((id) => p.get(id)!.gender)
         .sort()
         .join('');
-      expect(g).toBe({ MS: 'M', WS: 'F', MD: 'MM', WD: 'FF', XD: 'FM' }[kind]);
+      if (kind === 'MS' || kind === 'WS' || e.playerIds.length === 2)
+        expect(g).toBe({ MS: 'M', WS: 'F', MD: 'MM', WD: 'FF', XD: 'FM' }[kind]);
+      // a doubles player without a registered partner: the partner is named, or the entry waits for one
+      else expect(!!e.pendingPartner || e.status === 'pending', e.id).toBe(true);
+      expect(e.levels).toHaveLength(e.playerIds.length);
     }
     for (const ev of db.events) {
       const ids = db.entries.filter((e) => e.eventId === ev.id).flatMap((e) => e.playerIds);
       expect(new Set(ids).size).toBe(ids.length);
     }
-    expect(db.entries.filter((e) => e.status === 'pending').length).toBeGreaterThan(0);
-    expect(new Set(db.players.map((x) => x.name)).size).toBe(114);
+    expect(db.entries.filter((e) => e.status === 'pending')).toHaveLength(9);
+    expect(new Set(db.players.map((x) => x.name)).size).toBe(121);
   });
 
   it('links the demo player account and keeps the staff accounts', () => {
-    expect(db.players.find((x) => x.userId === 'u-player')?.id).toBe('p-M5');
-    expect(db.entries.some((e) => e.playerIds.includes('p-M5'))).toBe(true);
+    expect(db.players.find((x) => x.userId === 'u-player')?.id).toBe('p-28');
+    expect(db.entries.some((e) => e.playerIds.includes('p-28'))).toBe(true);
     expect(db.members.map((m) => m.role)).toEqual(['owner', 'scorer']);
   });
 });

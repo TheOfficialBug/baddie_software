@@ -51,6 +51,8 @@ interface Actions {
   addPlayer: (p: Omit<Player, 'id'>) => ID;
   updatePlayer: (id: ID, patch: Partial<Player>) => void;
   addEntry: (eventId: ID, playerIds: ID[], status?: Entry['status'], extra?: Pick<Entry, 'levels' | 'pendingPartner'>) => ID;
+  /** A doubles player waiting for a partner gets one: the entry becomes a pair (and is accepted). */
+  completePair: (entryId: ID, playerId: ID, level: SkillLevel) => void;
   setEntryStatus: (id: ID, status: Entry['status']) => void;
   /** Fix a level given for one event; slot = player's place in the entry (after the last: the named partner). */
   setEntryLevel: (entryId: ID, slot: number, level: SkillLevel) => void;
@@ -110,6 +112,8 @@ interface Actions {
   resetResults: (tid: ID) => void;
   /** Whole tournament: back to open registration, draws and results removed, entries kept. */
   resetDraws: (tid: ID) => void;
+  /** Match numbers (score slips) from 1 again, without gaps. */
+  renumberMatches: (tid: ID) => void;
 }
 
 export type State = DB & ViewerState & Actions;
@@ -124,14 +128,20 @@ const STAGE_NOTICE: Partial<Record<Tournament['status'], (t: Tournament) => { ti
   completed: () => ({ title: 'That is a wrap', body: 'All results are final. Thanks for playing!' }),
 };
 
-/** Bump when the shape of persisted data changes; older saved data is replaced with fresh demo data. */
-const STORE_VERSION = 11;
+/** Bump when the shape of persisted data changes; older saved data is replaced with fresh demo data unless migrated. */
+const STORE_VERSION = 12;
 const DB_KEYS = Object.keys(emptyDB()) as (keyof DB)[];
 
 /** The database part of the state (no viewer preferences, no actions). */
 export const selectDB = (s: DB): DB => Object.fromEntries(DB_KEYS.map((k) => [k, s[k]])) as unknown as DB;
 
 const freshState = (): DB & ViewerState => ({ ...buildIowaOpen(), noticesSeenAt: 0 });
+
+/** Before anything is called or played, keep match numbers (score slips) running from 1 without gaps. */
+const tidyNumbers = (d: DB, eventId: ID): DB => {
+  const tid = d.events.find((e) => e.id === eventId)?.tournamentId;
+  return tid && resets.beforeMatchDay(d, tid) ? resets.renumberMatches(d, tid) : d;
+};
 
 export const useStore = create<State>()(
   persist(
@@ -213,6 +223,16 @@ export const useStore = create<State>()(
           set((s) => ({ entries: [...s.entries, { id, eventId, playerIds, status, createdAt: Date.now(), ...extra }] }));
           return id;
         },
+        completePair: (entryId, playerId, level) =>
+          set((s) => ({
+            entries: s.entries.map((e) => {
+              if (e.id !== entryId || e.playerIds.length !== 1) return e;
+              const first = e.levels?.[0] ?? s.players.find((p) => p.id === e.playerIds[0])?.level ?? 'C';
+              const levels = [first, level];
+              const { pendingPartner: _, ...rest } = e;
+              return { ...rest, playerIds: [...e.playerIds, playerId], levels, status: 'accepted' as const };
+            }),
+          })),
         setEntryStatus: (id, status) => set((s) => ({ entries: s.entries.map((e) => (e.id === id ? { ...e, status } : e)) })),
         setEntryLevel: (entryId, slot, level) => commit(ops.setEntryLevel(db(), entryId, slot, level)),
         register: (tid, playerId, picks, total) => {
@@ -233,15 +253,16 @@ export const useStore = create<State>()(
         },
 
         publishDraw: (eventId, plan, rngSeed, seedOrder) => {
-          const next = ops.applySeeds(ops.publishPlan(db(), eventId, plan, rngSeed), eventId, seedOrder);
+          const next = tidyNumbers(ops.applySeeds(ops.publishPlan(db(), eventId, plan, rngSeed), eventId, seedOrder), eventId);
           const ev = next.events.find((e) => e.id === eventId)!;
           const resolved = ops.resolveTournament(next, ev.tournamentId);
           commit({ ...resolved, notices: [...resolved.notices, ops.drawPublishedNotice(ev, Date.now())] });
         },
-        clearDraw: (eventId) => commit(ops.clearDraw(db(), eventId)),
+        clearDraw: (eventId) => commit(tidyNumbers(ops.clearDraw(db(), eventId), eventId)),
         rearrangeDraw: (eventId, seating) => {
           const r = rearrangeDraw(db(), eventId, seating);
           if (!r.db) return r.error;
+          r.db = tidyNumbers(r.db, eventId);
           const ev = r.db.events.find((e) => e.id === eventId)!;
           commit({
             ...r.db,
@@ -382,9 +403,10 @@ export const useStore = create<State>()(
           return null;
         },
         resetEventResults: (eventId) => commit(resets.resetEventResults(db(), eventId)),
-        resetEventDraw: (eventId) => commit(resets.resetEventDraw(db(), eventId)),
+        resetEventDraw: (eventId) => commit(tidyNumbers(resets.resetEventDraw(db(), eventId), eventId)),
         resetResults: (tid) => commit(resets.resetTournamentResults(db(), tid)),
         resetDraws: (tid) => commit(resets.resetTournamentDraws(db(), tid)),
+        renumberMatches: (tid) => commit(resets.renumberMatches(db(), tid)),
         undo: (updateId) => {
           const u = get().updates.find((x) => x.id === updateId);
           if (!u) return;
@@ -412,8 +434,8 @@ export const useStore = create<State>()(
         for (const k of DB_KEYS) Object.assign(out, { [k]: s[k] });
         return out;
       },
-      // Older saved demos are replaced rather than migrated.
-      migrate: () => freshState() as State,
+      // 11 → 12: no change in shape (saved data is kept). Anything older is replaced.
+      migrate: (saved, version) => (version === 11 ? (saved as State) : (freshState() as State)),
     },
   ),
 );

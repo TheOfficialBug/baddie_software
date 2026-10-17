@@ -17,6 +17,319 @@ Template:
 
 ---
 
+## 2026-10-17 — Add a player by hand
+
+**What:** The Entries page has an **Add player** button (next to Import). One form enters a player like a row of
+the entry list: name, gender, club, singles and doubles levels, and the events they play (only events that fit
+their gender). Each doubles event takes a partner: a player already in the tournament (if that partner was
+entered alone, the entry becomes the pair), a typed name for a partner who hasn't registered, or none (the entry
+waits for a partner, status "to confirm"). Entries are accepted straight away otherwise. Typing the name of
+someone already in the tournament adds the new entries to them instead of creating a duplicate. The per-event
+"Add entry" stays as it was.
+**Why:** Requested: manual entry for players.
+**Files:** `src/features/admin/entries/AddPlayerDialog.tsx` (+ test), `src/features/admin/entries/AdminEvents.tsx`,
+`src/data/store.ts` (`completePair`)
+**Checks:** `npm run check` passes (2130 tests). Headless Chrome: the form opens from Entries; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-17 — Demo seed anonymised
+
+**What:** The demo field keeps the Iowa Open 2026 shape (121 players, genders, levels, events and doubles pairings)
+but with invented names and clubs; players of one real club share one invented club, so club separation behaves
+the same. Real names were also taken out of the worklog and a seeding-list placeholder. The real entry list is
+loaded in the app with Entries → Import (the tournamentsoftware.com .xlsx export) and stays in that browser.
+**Why:** Requested: hide the real player list from GitHub.
+**Files:** `src/data/seed/iowaOpenEntries.ts`, `src/data/seed/iowaOpen.ts`, `src/features/admin/draws/SeedingList.tsx`,
+`docs/WORKLOG.md`
+**Checks:** `npm run check` passes (2128 tests); a scan for every name on the list finds none from this work.
+**Follow-up:** Folded into the earlier commit and force-pushed so the real names leave the branch on GitHub.
+
+## 2026-10-16 — Clubs column on brackets (can be switched off)
+
+**What:** Brackets have a **Clubs** button in their controls (next to zoom and Fit). When on, a column left of
+round 1 shows each player's club on the same line as their name (doubles: both clubs; no club: blank). Off by
+default and remembered on this device, so the bracket stays simple unless you want it. Works on the setup
+preview, Move players, published draws and the public pages.
+**Why:** Requested: show the club on the left, with a way to hide it so the bracket doesn't get too busy.
+**Files:** `src/components/draw/Bracket.tsx`, `src/components/draw/DrawCanvas.tsx`
+**Checks:** `npm run check` passes (2128 tests). Headless Chrome: Men's Singles Flight A with Clubs on, clubs line up
+with names; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Move players before publishing
+
+**What:** The draw setup screen has a **Move players** button (knockout and drop flight, including By results).
+It shows the first round as tappable places: tap a player, then another player or a bye place, and they swap
+(a swap that would leave a line with nobody in it is refused). The preview, flights and warnings are worked out
+again from the moved first round, and **Publish draw** publishes it exactly. A banner says the draw uses your
+placements, with **Reset placements**; shuffling or changing a setting, the seeds or the seeding order also goes
+back to the automatic draw. The moved first round is saved with the unpublished setup on this device.
+Round robin groups can't be moved here yet.
+**Why:** Requested: move players around by hand before publishing (Edit placements only worked after publishing).
+**Files:** `src/features/admin/draws/DrawSetup.tsx`, `src/features/admin/draws/DrawSetup.test.tsx`
+**Checks:** `npm run check` passes (2128 tests). Headless Chrome: Men's Singles, swapped a player with a bye,
+banner shown, published first round matches the moved one; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Seed numbers in the draw preview
+
+**What:** The unpublished draw preview on the setup screen now shows seed numbers ([1], [2] …) for the seeded
+entries, as the published draw does. Before, seeds were only stored when a draw was published, so events still
+in setup (e.g. WS, MD, WD, XD) showed no numbers. How many entries get a number is still the event's Seeds setting.
+**Why:** Requested: seed numbers for the other events too (seeded players only).
+**Files:** `src/features/admin/draws/DrawSetup.tsx`
+**Checks:** `npm run check` passes (2127 tests). Headless Chrome: Mixed Doubles preview shows [1], [4], [5], [8] …
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Match numbers (score slips) from 1
+
+**What:** Match numbers can start from 1 again. Settings → Reset has a **Renumber matches from 1** row: every match
+becomes #1, #2 … with no gaps, each event keeping its block and order (results, courts and draws stay; the
+confirmation says to reprint slips). And while nothing in the tournament has been called or played, publishing,
+editing or removing a draw renumbers by itself, so redoing an event's draw no longer pushes slips into the hundreds.
+Once a match has been called or played, numbers change only with the button.
+**Why:** Requested: reset the score slips to start from 1 (redrawn events kept taking new, higher numbers).
+**Files:** `src/data/resets.ts` (`renumberMatches`, `beforeMatchDay`), `src/data/store.ts`,
+`src/features/admin/settings/ResetSection.tsx`, `src/data/resets.test.ts`
+**Checks:** `npm run check` passes (2127 tests). Headless Chrome: publish MS (#1–94) and WS (#1–139), remove the MS
+draw → WS is #1–45; the Settings row shows "already in order"; no console errors.
+**Follow-up:** Not committed yet. Draws already in your browser with high numbers: use the Renumber button once.
+
+## 2026-10-16 — A–D: round-1 byes for the top seeds where it's free
+
+**What:** The A–D layout search now runs in two stages: first the fewest players outside their flight (as before),
+then, never at that cost, round-1 byes for the seeds, best first (a seed with a bye meets a C/D bye holder in round
+2). Club spreading after the search is kept only if it doesn't put anyone outside their flight (it could flip a
+same-level match). 12 per level with 8 seeds → the top 4 seeds have byes; 6 per level with 4 seeds → the top 2;
+Iowa Men's Doubles → all 8 seeds; Iowa Men's Singles (7 A, 12 B, 17 C, 12 D) → 1 seed, because every A/B player is
+needed to beat a C/D player first (an A with a bye takes one C/D player instead of two).
+**Why:** Asked whether some byes can go to the top seeds.
+**Files:** `src/engine/draws.ts`, `src/engine/draws.test.ts`, `docs/RULES.md`
+**Checks:** `npm run check` passes (2124 tests). Misses unchanged (Iowa Men's Singles 3, the minimum); 50–180 ms a draw.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — A–D flights set by each player's first two matches; byes only in round 1
+
+**What:** A/B/C/D drop flights with levels no longer use byes in the middle of the bracket. A player's flight is
+set by their first two matches, whatever rounds they fall in: A win-win, B win-lose, C lose-win, D lose-lose. So
+in Flight A a first-match loss drops to C, a second-match loss to B, later losses are out; a player's first C match
+decides C or D. All byes are in round 1 (a bye holder's first match is in round 2). The first round is found by a
+search that swaps players and byes to minimise the players expected (higher level wins) to finish outside their
+level's flight; each match's loser route is fixed from its expected loser. Flight C is arranged the same way (first C
+match is C beats D). The draw editor's rebuild passes levels, so edited draws route the same way. The draw page help
+explains the win/lose rule.
+**Why:** Requested: no mid-bracket byes or skips; fill those places with A v B matches instead; a player may lose
+their second match in round 3, as long as A = win, win · B = win, lose · C = lose, win · D = lose, lose.
+**Files:** `src/engine/draws.ts`, `src/engine/draws.test.ts`, `src/data/placements.ts`,
+`src/features/admin/draws/DrawSetup.test.tsx`, `src/components/draw/EventDraw.tsx`, `docs/RULES.md`
+**Checks:** `npm run check` passes (2123 tests). Played out with the higher level winning: 12/12/12/12, 6/6/6/6,
+5/5/5/5, 4/4/4/4 → nobody outside their flight, no later byes; demo Men's Singles (7/12/17/12) → 3 (the minimum:
+7 A and 12 B can take at most 26 of 29 C/D players in a first match) in 57 of 60 seeds, otherwise 4; about 75 ms a
+draw. Headless Chrome: Flight A shows only round-1 byes, round 2/3 pairings as intended.
+**Follow-up:** Not committed yet. An upset sends the loser where the expected loser would have gone.
+
+## 2026-10-16 — A–D draws so each player lands in the flight of their level (Byes setting removed)
+
+**What:** Removed the Byes (round 1 / round 2) setting added earlier today, with its migration. A/B/C/D drop
+flights with levels are now drawn so each player finishes in the flight of their level: A round 1 is A/B v C/D
+(C/D drop to C), A round 2 is A v B (B drop to B), C round 1 is C v D (D drop to D). Byes only where the numbers
+need them: extra A/B entries skip round 1, extra A players skip round 2, extra C players skip C round 1, plus
+knockout byes later in A and C. Uneven numbers give the fewest mismatches the numbers allow (C/D v C/D in A round 1,
+round-2 matches without an A player, D v D in C round 1), each with a warning. Flight B takes A round-2 losers only.
+The draw summary counts byes by round (e.g. "4 round-3 byes"). Without levels, with Random draw, for A/B, or when
+the draw editor rebuilds a draw, the previous drawing is used (Flight C is still C v D when levels are known).
+**Why:** Requested: no Byes setting; byes only when needed; players must fall in the bracket of their level
+(e.g. no C v D in A round 1, since the C player would then advance).
+**Files:** `src/engine/draws.ts`, `src/engine/pairing.ts`, `src/engine/types.ts`, `src/engine/draws.test.ts`,
+`src/features/admin/draws/DrawSettings.tsx`, `src/features/admin/draws/DrawCheck.tsx`,
+`src/features/admin/draws/DrawSetup.tsx`, `src/components/draw/EventDraw.tsx`, `supabase/SCHEMA.md`, `docs/RULES.md`;
+deleted `supabase/migrations/20261016130000_drop_flight_byes.sql`
+**Checks:** `npm run check` passes (2122 tests). Playing draws out with the higher level winning: equal numbers per
+level (4/4/4/4, 6/6/6/6, 12/12/12/12, 8/4/2/2 …) → nobody in the wrong flight; demo Men's Singles (7/12/17/12) → 10,
+all forced by the numbers (5 C/D v C/D, 5 round-2 matches without an A). Headless Chrome: Flight A and C look right.
+**Follow-up:** Not committed yet. A player who skips A round 2 and loses later is out (no drop to B).
+
+## 2026-10-16 — Byes setting for A–D and A–B drop flights (default: round 1)
+
+**What:** A new **Byes** setting (Round 1 / Round 2) for A/B/C/D and A/B drop flights, next to Pairing.
+**Round 1** (default): the top seeds skip round 1 as in any knockout; the A/B entries left play the C/D entries and
+any C/D entries beyond that meet each other (the warning says the round-1 byes are why). **Round 2**: the behaviour
+from earlier today, everyone plays round 1 (C/D v A/B) and the byes move to round 2. Stored as `dropByes` on the
+event config and a `drop_byes` column in the database.
+**Why:** Requested, with round 1 as the default.
+**Files:** `src/engine/types.ts`, `src/engine/pairing.ts`, `src/engine/draws.ts`, `src/engine/draws.test.ts`,
+`src/data/assign.test.ts`, `src/features/admin/draws/DrawSettings.tsx`,
+`supabase/migrations/20261016130000_drop_flight_byes.sql`, `supabase/SCHEMA.md`, `docs/RULES.md`
+**Checks:** `npm run check` passes (2126 tests, migration applies). Headless Chrome, demo Men's Singles (19 A/B,
+29 C/D): Round 1 → 16 round-1 byes and 13 C/D v C/D with the explaining warning; Round 2 → 8 round-2 byes and 5
+C/D v C/D; no console errors.
+**Follow-up:** Not committed yet. Existing events default to Round 1, so a draw drafted with round-2 byes changes
+until Byes is set to Round 2.
+
+## 2026-10-16 — Draw setup redraws when levels change
+
+**What:** The draw preview on the setup screen now recalculates when an entry's level changes (in the seeding
+panel or on the entries page), not only when the order, settings or shuffle change. Before, a level change left
+the old pairings in place while the "Round 1 levels" chips relabelled them with the new levels, so the draw looked
+updated when it wasn't.
+**Why:** Reported: levels were updated in the seeding panel but the A–D draw still treated the field as 19 A/B.
+**Files:** `src/features/admin/draws/DrawSetup.tsx`, `src/features/admin/draws/DrawSetup.test.tsx`
+**Checks:** `npm run check` passes (2123 tests). The new test fails without the fix (the draw's own C/D-v-C/D
+warning stays after every C becomes a B) and passes with it.
+**Follow-up:** Not committed yet. In A–D the A/B v C/D split follows levels, not the order of the seeding list.
+
+## 2026-10-16 — A–D flight: round 2 is A v B, not B v B
+
+**What:** When Flight A has round-2 byes, they are no longer all given to the best-ranked round-1 winners (the
+A players). They're split between the top band (A) and the rest so that the players left in round 2 are half each,
+and round 2 pairs best against worst, so A players meet B (or C) players. Men's Singles in the demo: round 2 was
+B v B throughout; now A v C ×5, A v B ×2 and one B v B (7 A and 9 others play round 2, so two others must meet);
+8 B players skip round 2. Top seeds may now play round 2 instead of skipping it.
+**Why:** Reported: B v B matches in round 2 of the A–D flight.
+**Files:** `src/engine/pairing.ts`, `src/engine/draws.test.ts`, `docs/RULES.md`
+**Checks:** `npm run check` passes (2122 tests).
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — First-match scoring only when both players are new
+
+**What:** In knockouts and drop flights, the first-match format (e.g. one game to 30) is now used only when both
+players are playing their first match in the event. A player coming off a bye who meets someone who has already
+played now plays full sets (the main format). Two bye holders meeting still play the first-match format.
+Group matches in round robin are unchanged.
+**Why:** Requested.
+**Files:** `src/engine/rules.ts`, `src/engine/roundRules.test.ts`, `src/data/assign.test.ts`,
+`src/features/admin/entries/EventDialog.tsx` (hint text), `docs/RULES.md`
+**Checks:** `npm run check` passes (2121 tests).
+**Follow-up:** Not committed yet. The format is worked out per match from who is in it, so an already-published
+draw switches to the new rule straight away.
+
+## 2026-10-16 — Cleaner bracket lines
+
+**What:** Brackets now use a tree layout: drawn first-round matches stack with no gaps, and each later match sits
+midway between the matches its players come from. Connectors are elbow lines drawn in one SVG layer (out of the
+match, down or up in the gap, into the next match). A player who skips a round with a bye gets one straight line
+across that column instead of stubs that stop in empty space. Flight A with round-2 byes names its rounds
+"Round 1, Round 2 …" instead of "Round of 64" for a 48-player field. Full brackets (knockouts, lower flights,
+the draw editor) keep the same shape.
+**Why:** Requested: the A–D flight lines were hard to follow (gaps where round-2 byes sat, long lines through
+the round-2 column, matches off-centre from their feeders).
+**Files:** `src/components/draw/Bracket.tsx`, `src/engine/draws.ts`
+**Checks:** `npm run check` passes (2121 tests). Headless Chrome on the demo Men's Singles A–D (Flight A and C)
+and a knockout preview; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Move placement-round byes by hand
+
+**What:** In the draw editor (Edit placements) for a "By results" draw, an **Add a bye line** button adds an empty
+round-1 line. Take a player out of their match and put them in it: they get a bye, and so does their opponent unless
+that place is filled. Empty added lines are ignored and can be removed. On publish the placement rounds are rebuilt
+and renumbered; the added lines rank after the published ones. Existing byes could already be moved (now tested).
+Only before any match in the event is played, and only for placement rounds.
+**Why:** Requested: organizers want to move the byes in the placement round themselves (e.g. when the draw gives none).
+**Files:** `src/features/admin/draws/DrawEditor.tsx`, `src/data/placements.ts`, `src/engine/draws.ts`, `src/data/placements.test.ts`
+**Checks:** `npm run check` passes (2121 tests). Headless Chrome on the demo Men's Singles by results (no round-1
+byes): added a line, moved a player into it, published; that player and the opponent they left got round-1
+byes and went straight into round 2 upper; no console errors.
+**Follow-up:** Not committed yet. Later rounds don't preview in the editor while added lines are in use (they update on publish).
+
+## 2026-10-16 — By results: C/D entries play A/B entries in placement round 1
+
+**What:** In "By results" draws, placement round 1 now pairs every C/D entry with an A/B entry: A/B entries form
+the top half and C/D entries the bottom half (each in seeding order), and round-1 byes are capped so enough A/B
+entries stay in round 1. Clubmate swaps never create a C/D v C/D match. When C/D entries outnumber A/B entries the
+unavoidable C/D v C/D matches are kept to the minimum and the draw warns. The seeding-list hint and RULES.md say so.
+**Why:** Reported: C beat D in round 1, went to round 2 upper, lost to a stronger player and landed in Flight B.
+**Files:** `src/engine/draws.ts`, `src/engine/placement.test.ts`, `src/features/admin/draws/SeedingList.tsx`, `docs/RULES.md`
+**Checks:** `npm run check` passes (2118 tests). Seed Men's Singles (19 A/B, 29 C/D) by results: 19 A/B v C/D and
+5 C/D v C/D round-1 matches (was 12 C v D).
+**Follow-up:** Not committed yet. Fields with 12 per level now get no round-1 byes (flights of 12) instead of 16 byes.
+
+## 2026-10-16 — Placement rounds ("By results") back
+
+**What:** Restored the "By results" drop flight from the last commit: the engine (`placementDraw`), the Placement
+tab (`PlacementTree`) and its tests, the By results option and Byes setting, the setup header ("2 placement rounds,
+then 4 flights"), the seeding-list wording, and the rules in RULES.md. The uncommitted migration that dropped
+`placement_byes` was deleted and the schema doc restored, and saved browser data is no longer converted from
+By results to A/B/C/D. Kept from today: A/B/C/D stays the default for new events, and its C/D-v-A/B round 1,
+round-2 byes and bracket lines are unchanged. The old "Use By results" tip on the setup screen was not restored:
+it said lower levels meet in A/B/C/D round 1, which is no longer true.
+**Why:** Requested.
+**Files:** `src/engine/draws.ts`, `src/engine/types.ts`, `src/engine/placement.test.ts`,
+`src/components/draw/PlacementTree.tsx`, `src/components/draw/EventDraw.tsx`, `src/components/draw/Bracket.tsx`,
+`src/components/draw/modeLabels.ts`, `src/data/queries.ts`, `src/data/store.ts`,
+`src/features/admin/draws/DrawSettings.tsx`, `src/features/admin/draws/DrawSetup.tsx`,
+`src/features/admin/draws/SeedingList.tsx`, `supabase/SCHEMA.md`, `docs/RULES.md`; deleted
+`supabase/migrations/20261016120000_remove_drop_flight_placement.sql`
+**Checks:** `npm run check` passes (2116 tests). Headless Chrome: Men's Singles switched to By results shows the
+Placement tab (round 1, round 2 upper and lower) and flights A–D; no console errors.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Seed data from the real Iowa Open 2026 player list
+
+**What:** The demo tournament (Iowa Open Test 26) now holds the real field from "Iowa Open 2026 Players.xlsx"
+(tournamentsoftware.com export): 121 players, 178 entries (MS 48, WS 24, MD 35, WD 21, XD 50). Every event is an
+A/B/C/D drop flight. Singles use Level1, doubles Level2. Doubles partners were matched from the typed partner
+names (84 mutual pairs, the rest one-way); 2 MD entries name a partner who isn't on the list (pending partner),
+and 9 doubles entries with no partner given wait for the organizer (status pending). Birth dates and home towns
+were left out (birth year = tournament year − 25, as the entry-list import does). The demo Player account is
+linked to player p-28.
+**Why:** Requested: import the real player list into the seed data, with drop flight as the default event type.
+**Files:** `src/data/seed/iowaOpenEntries.ts` (generated), `src/data/seed/iowaOpen.ts`, `src/config/demo.ts`,
+`src/test/fixtures/sampleTournaments.ts`, `src/data/simulate.test.ts`, `src/data/placements.test.ts`,
+`src/data/assign.test.ts`
+**Checks:** `npm run check` passes (2062 tests). Drawn from the seed, every event has more C/D than A/B entries,
+so each draw has a few C/D v C/D round-1 matches (MS 5, WS 5, MD 6, WD 4, XD 6) and says so.
+**Follow-up:** Not committed yet. Saved browser data keeps the old demo until Settings → Reset demo data.
+The repo keeps only invented names and clubs (see the later entry); the real list is loaded with Entries → Import.
+
+## 2026-10-16 — Bracket line through a round-2 bye
+
+**What:** When a round-1 winner skips round 2, the bracket now draws a straight line across the round-2 column to
+their round-3 match, instead of a line that stops in empty space.
+**Why:** Reported: the draw looked disconnected after round-2 byes were added.
+**Files:** `src/components/draw/Bracket.tsx`
+**Checks:** `npm run check` passes. Headless Chrome on the demo MS drop flight: round-1 matches #4, #7, #8 connect
+through the Round of 32 to their Round of 16 matches.
+**Follow-up:** Not committed yet.
+
+## 2026-10-16 — Drop flight: C/D entries never meet in A round 1
+
+**What:** In Flight A round 1 every C/D entry now plays an A/B entry. When there are more C/D entries than the
+usual round-1 matches (N − S/2), round 1 gets one match per C/D entry, fewer top players get round-1 byes and the
+other byes move to round 2 (the best-ranked round-1 winners skip it). Flight B takes the losers of each player's
+second A match (round 2, or round 3 for anyone who skipped round 2), so nobody leaves A before their third match.
+No C/D entry gets a bye. If C/D entries outnumber A/B entries the unavoidable C/D v C/D matches are kept to the
+minimum and the draw warns. The setup header counts byes as drawn, and the round-1 summary shows round-2 byes.
+**Why:** Requested: C and D players should lose their first A match (to an A/B player) and drop to C, not beat each other.
+**Files:** `src/engine/pairing.ts` (`arrangeDropFlight`), `src/engine/draws.ts`, `src/engine/draws.test.ts`,
+`src/components/draw/Bracket.tsx`, `src/components/draw/EventDraw.tsx`, `src/features/admin/draws/DrawSetup.tsx`,
+`src/features/admin/draws/DrawCheck.tsx`, `docs/RULES.md`
+**Checks:** `npm run check` passes. Headless Chrome on the demo MS drop flight (39 entries, 21 C/D v 18 A/B): round 1
+shows 2 C v D (the minimum), 1 bye, 12 round-2 byes; Flight B is fed by round-2 and round-3 losers; no console errors.
+**Follow-up:** Not committed yet. With "Random draw" pairing levels are ignored, so C/D can still meet.
+
+## 2026-10-16 — Placement rounds removed from drop flights
+
+**What:** Removed the "By results" drop flight (two placement rounds, then flights) and the **Placement** tab on the
+draws page. Every drop flight now starts everyone in Flight A: lose A round 1 → C, lose A round 2 → B, lose C round 1
+→ D; winning A rounds 1 and 2 keeps you in A, winning C round 1 keeps you in C. A/B/C/D is the default for new events
+(A/B is still available). Gone with it: the "By results" option, the Byes setting, the "Use By results" tip on the
+setup screen, and the placement wording in the seeding list.
+**Why:** Requested: no placement section; flights should follow the classic A/B/C/D drop rules.
+**Files:**
+- Engine: `src/engine/draws.ts`, `src/engine/types.ts`; deleted `src/engine/placement.test.ts`
+- UI: `src/components/draw/EventDraw.tsx`, `src/components/draw/Bracket.tsx`, `src/components/draw/modeLabels.ts`,
+  `src/features/admin/draws/DrawSettings.tsx`, `src/features/admin/draws/DrawSetup.tsx`,
+  `src/features/admin/draws/SeedingList.tsx`, `src/features/admin/entries/EventDialog.tsx`,
+  `src/features/admin/home/NewTournamentDialog.tsx`; deleted `src/components/draw/PlacementTree.tsx`
+- Data: `src/data/queries.ts`, `src/data/store.ts` (store version 12; saved version-11 data is kept and its By results
+  events become A/B/C/D. The first version of this change reset saved data to the demo instead)
+- Database: `supabase/migrations/20261016120000_remove_drop_flight_placement.sql` (By results events → ABCD, drops
+  `placement_byes`), `supabase/SCHEMA.md`
+- Docs: `docs/RULES.md`
+**Checks:** `npm run check` passes (2051 tests, migrations apply).
+**Follow-up:** Not committed yet. `PLACEMENT` stays in the Postgres `drop_variant` enum (enum values can't be dropped) but nothing uses it.
+
 ## 2026-10-16 — "Byes" setting for By results draws (round 1 by default)
 
 **What:** New **Byes** menu next to Pairing for "By results" draws: **Placement round 1** (default, as requested:
@@ -249,9 +562,7 @@ same layout as .xlsx, so it can be edited in Excel and imported again.
 tests `src/lib/xlsx.test.ts`, `src/data/entryList.test.ts`, `ImportEntriesDialog.test.tsx`.
 **Checks:** New tests pass (20). Tried against the real file: all 121 players read, 178 entries + 2 withdrawn,
 export → re-import changes nothing.
-**Follow-up:** Not committed yet. On the real list, check: Kent Sta Maria (XD names Kasia Klapacz, who is paired
-with Mathew Paramben), Billy Dang (MD names "Lucas Chen", paired with Ssu Tsan Chang), Satya Kosaraju's MD partner
-"Shunquin" (Shun Quinlan is female), and 9 doubles entries with no partner given.
+**Follow-up:** Not committed yet. On the real list, check the few doubles pairs matched from one-way partner names, a partner typed with the wrong gender, and the doubles entries with no partner given.
 
 ## 2026-10-13 — Score slip shows the right number of games
 

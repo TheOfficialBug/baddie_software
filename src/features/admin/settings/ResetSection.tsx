@@ -18,6 +18,7 @@ export function ResetSection({ t }: { t: Tournament }) {
   const lk = useLookup();
   const resetResults = useStore((s) => s.resetResults);
   const resetDraws = useStore((s) => s.resetDraws);
+  const renumber = useStore((s) => s.renumberMatches);
   const resetDemo = useStore((s) => s.resetDemo);
   const demo = useAuth((s) => s.backend?.kind === 'demo');
   const { ask, dialog } = useConfirm();
@@ -25,6 +26,9 @@ export function ResetSection({ t }: { t: Tournament }) {
   const matches = lk.matchesOf(t.id).filter((m) => m.status !== 'bye' && m.number > 0);
   const results = matches.filter((m) => m.status === 'finished' || m.status === 'on_court' || m.games.length).length;
   const drawn = lk.eventsOf(t.id).filter((e) => e.drawState === 'published').length;
+  // already 1, 2, 3 … with no gaps?
+  const numbers = matches.map((m) => m.number).sort((a, b) => a - b);
+  const tidy = numbers.every((n, i) => n === i + 1);
 
   const row = (title: string, body: ReactNode, button: ReactNode) => (
     <li className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -68,6 +72,39 @@ export function ResetSection({ t }: { t: Tournament }) {
             }
           >
             Clear results
+          </Button>,
+        )}
+        {row(
+          'Renumber matches from 1',
+          <>
+            Match numbers and score slips run 1, 2, 3 … again with no gaps; each event keeps its order.{' '}
+            {matches.length ? (
+              <>
+                Now <span className="num">#{numbers[0]}</span> to <span className="num">#{numbers[numbers.length - 1]}</span>
+                {tidy ? ', already in order.' : '.'}
+              </>
+            ) : (
+              'No matches yet.'
+            )}
+          </>,
+          <Button
+            size="sm"
+            icon={<Icon name="refresh" size={16} />}
+            disabled={!matches.length || tidy}
+            onClick={() =>
+              ask({
+                title: `Renumber the matches in ${t.name} from 1?`,
+                body: `Matches become #1 to #${matches.length}, in the same order. Results, courts and draws stay.`,
+                warning: 'Score slips you already printed or handed out show the old numbers: print them again.',
+                confirmLabel: 'Renumber matches',
+                onConfirm: () => {
+                  renumber(t.id);
+                  toast('Matches renumbered from 1', { detail: 'Print the score slips again.' });
+                },
+              })
+            }
+          >
+            Renumber
           </Button>,
         )}
         {row(

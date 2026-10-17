@@ -151,7 +151,7 @@ export function SeedingList({
           Drag a row or use the arrows.{' '}
           {placement && (pairing ?? 'balanced') !== 'random' ? (
             <>
-              Round 1 follows this list exactly: any byes go to the top of it, then the top half of the rest plays the bottom half
+              Round 1 follows this list, A/B entries first: any byes go to the top of it, then each C/D entry plays an A/B entry
               {pairing === 'classic' ? ' (best v worst)' : ' (first of each half together)'}.
             </>
           ) : (
@@ -254,7 +254,7 @@ export function SeedingList({
             value={pasted}
             onChange={(e) => setPasted(e.target.value)}
             rows={6}
-            placeholder={'1\tJason Ung\tA\n2\tPetro Takalo\tA\n…'}
+            placeholder={'1\tAlex Kim\tA\n2\tSam Rao\tA\n…'}
             className="num w-full rounded-xl border border-line bg-surface p-2.5 text-[13px] outline-none focus:border-info"
           />
           {pastePlan && (

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { spreadClubs } from './clubSpread';
 import { bwfSeedCount, type DrawInput, generateDraw, groupCount, nextPow2, placeKnockout, roundRobinPairs, seedLines } from './draws';
-import { arrangeBalanced, LEVEL_VALUE, rankByLevel, separateGroups } from './pairing';
+import { arrangeBalanced, arrangeDropFlight, LEVEL_VALUE, rankByLevel, separateGroups } from './pairing';
 import { hashString, mulberry32, shuffle } from './rng';
 import type { DrawPlan, EventConfig, ID, Match, Mode, SlotSource, TEvent } from './types';
 
@@ -538,10 +538,12 @@ describe('generateDraw · level-aware pairing', () => {
       ['knockout', 'ev-main', 'classic'],
       ['drop_flight', 'ev-A', 'balanced'],
       ['drop_flight', 'ev-A', 'classic'],
-    ] as const)('%s %s with %s pairing places entries with arrangeBalanced, then spreads clubmates', (mode, stageId, pairing) => {
-      const plan = draw(mode, n, { pairing }, { seeds, levelOf, clubOf, rngSeed: RNG });
+    ] as const)('%s %s with %s pairing places entries (drop flight: C/D v A/B), then spreads clubmates', (mode, stageId, pairing) => {
+      // drop flight A/B: A/B/C/D with levels is drawn by levelledFlights (tested below)
+      const plan = draw(mode, n, { pairing, variant: 'AB' }, { seeds, levelOf, clubOf, rngSeed: RNG });
       const ids = entryIds(n);
-      const arranged = arrangeBalanced({ entryIds: ids, seeds, levelOf, clubOf, pairing, rand: mulberry32(RNG) });
+      const arrange = mode === 'drop_flight' ? arrangeDropFlight : arrangeBalanced;
+      const arranged = arrange({ entryIds: ids, seeds, levelOf, clubOf, pairing, rand: mulberry32(RNG) });
       const expected = spreadClubs({
         lines: arranged.lines,
         seeded: new Set(ids.slice(0, seeds)),
@@ -600,6 +602,136 @@ describe('generateDraw · level-aware pairing', () => {
       )
       .sort();
     expect(pairsSeen).toEqual(['A–C', 'A–C', 'A–C', 'A–C', 'B–D', 'B–D', 'B–D', 'B–D']);
+  });
+
+  describe('A/B/C/D with levels: every player lands in the flight of their level', () => {
+    /** `mix` = how many A, B, C, D entries; ids e1… in that order */
+    const field = (mix: number[]) => {
+      const lv: number[] = mix.flatMap((k, i) => Array<number>(k).fill(4 - i));
+      return { n: lv.length, levelOf: (id: ID) => lv[Number(id.slice(1)) - 1] };
+    };
+    const letter = (v: number) => (v >= 3.5 ? 'A' : v > 2 ? 'B' : v >= 2 ? 'C' : 'D');
+    /** Play the draw out with the higher level always winning; the flight each entry finishes in. */
+    function finish(plan: DrawPlan, levelOf: (id: ID) => number) {
+      const win = new Map<ID, ID | 'BYE'>();
+      const lose = new Map<ID, ID | 'BYE'>();
+      const flight = new Map(plan.stages.map((s) => [s.id, s.flight]));
+      const last = new Map<ID, string | undefined>();
+      const who = (s: SlotSource): ID | 'BYE' | undefined =>
+        s.kind === 'entry'
+          ? s.entryId
+          : s.kind === 'bye'
+            ? 'BYE'
+            : s.kind === 'winner'
+              ? win.get(s.matchId)
+              : s.kind === 'loser'
+                ? lose.get(s.matchId)
+                : undefined;
+      for (let pass = 0; pass < 40; pass++)
+        for (const m of plan.matches) {
+          if (win.has(m.id)) continue;
+          const [a, b] = [who(m.srcA), who(m.srcB)];
+          if (a === undefined || b === undefined) continue;
+          const aWins = b === 'BYE' || (a !== 'BYE' && levelOf(a) >= levelOf(b));
+          win.set(m.id, aWins ? a : b);
+          lose.set(m.id, aWins ? b : a);
+          for (const e of [a, b]) if (e !== 'BYE') last.set(e, flight.get(m.stageId));
+        }
+      return last;
+    }
+    const wrong = (plan: DrawPlan, ids: ID[], levelOf: (id: ID) => number) => {
+      const last = finish(plan, levelOf);
+      return ids.filter((id) => last.get(id) !== letter(levelOf(id)));
+    };
+    /** Byes in a flight after its round 1 (an empty corner of the bracket). */
+    const laterByes = (plan: DrawPlan, stageId: ID) =>
+      plan.matches.filter((m) => m.stageId === stageId && m.round > 1 && (m.srcA.kind === 'bye' || m.srcB.kind === 'bye'));
+
+    it.each([
+      [4, 4, 4, 4],
+      [6, 6, 6, 6],
+      [5, 5, 5, 5],
+      [12, 12, 12, 12],
+    ])('A/B/C/D = %i/%i/%i/%i: nobody finishes in the wrong flight, no warnings, byes only in round 1', (...mix) => {
+      const { n, levelOf } = field(mix);
+      for (const pairing of ['balanced', 'classic'] as const) {
+        const plan = draw('drop_flight', n, { pairing }, { levelOf, seeds: bwfSeedCount(n) });
+        expect(wrong(plan, entryIds(n), levelOf), pairing).toEqual([]);
+        expect(plan.warnings, pairing).toEqual([]);
+        for (const st of ['ev-A', 'ev-C']) expect(laterByes(plan, st), `${pairing} ${st}`).toEqual([]);
+      }
+    });
+
+    it.each([
+      [7, 12, 17, 12],
+      [3, 5, 6, 4],
+      [10, 6, 6, 10],
+      [2, 3, 6, 6],
+    ])('A/B/C/D = %i/%i/%i/%i: still no byes after round 1 in flights A and C', (...mix) => {
+      const { n, levelOf } = field(mix);
+      const plan = draw('drop_flight', n, {}, { levelOf });
+      expect(laterByes(plan, 'ev-A')).toEqual([]);
+      expect(laterByes(plan, 'ev-C')).toEqual([]);
+    });
+
+    it('48 players, 12 per level: 16 round-1 byes; some players play their first two matches in rounds 2 and 3', () => {
+      const { n, levelOf } = field([12, 12, 12, 12]);
+      const plan = draw('drop_flight', n, {}, { levelOf });
+      const r1 = roundIn(plan, 'ev-A', 1);
+      expect(r1.filter((m) => !isReal(m))).toHaveLength(16);
+      // every C/D player's first match is against an A/B player: none of them meet in round 1
+      const low = (s: SlotSource) => s.kind === 'entry' && levelOf(s.entryId) <= 2;
+      expect(r1.filter((m) => low(m.srcA) && low(m.srcB))).toEqual([]);
+      // flight B also takes losers from round 3: B players with a round-1 bye lose their second match there
+      const bFeeders = plan.matches.filter((m) => m.loserTo === 'B flight');
+      expect(new Set(bFeeders.map((m) => m.round))).toEqual(new Set([2, 3]));
+    });
+
+    it('the real Men’s Singles mix (7 A, 12 B, 17 C, 12 D): close to the 3 misses the numbers force, with a warning', () => {
+      // 7 A and 12 B can take at most 2×7 + 12 = 26 of the 29 C/D players in their first match
+      const { n, levelOf } = field([7, 12, 17, 12]);
+      const plan = draw('drop_flight', n, {}, { levelOf, seeds: 8 });
+      // the layout is found by search: the minimum (3) almost always, never more than one above it
+      const bad = wrong(plan, entryIds(n), levelOf).length;
+      expect(bad).toBeGreaterThanOrEqual(3);
+      expect(bad).toBeLessThanOrEqual(4);
+      expect(plan.warnings.join(' ')).toMatch(new RegExp(`${bad} players are expected to finish outside their level's flight`));
+    });
+
+    it('top seeds get the round-1 byes where that costs nobody their flight', () => {
+      // 48 players, 12 per level, 8 seeds: 4 A players can have a bye (each meets a C/D bye holder in round 2)
+      const { n, levelOf } = field([12, 12, 12, 12]);
+      const plan = draw('drop_flight', n, {}, { levelOf, seeds: 8 });
+      const holders = roundIn(plan, 'ev-A', 1)
+        .filter((m) => (m.srcA.kind === 'bye') !== (m.srcB.kind === 'bye'))
+        .flatMap((m) => [m.srcA, m.srcB].flatMap((x) => (x.kind === 'entry' ? [x.entryId] : [])));
+      expect(['e1', 'e2', 'e3', 'e4'].every((s) => holders.includes(s))).toBe(true);
+      expect(wrong(plan, entryIds(n), levelOf)).toEqual([]);
+    });
+
+    it('a loser goes to C after their first match, to B after their second, and is out after that', () => {
+      const { n, levelOf } = field([12, 12, 12, 12]);
+      const plan = draw('drop_flight', n, {}, { levelOf });
+      const a = plan.matches.filter((m) => m.stageId === 'ev-A' && isReal(m));
+      expect(a.some((m) => m.loserTo === 'C flight')).toBe(true);
+      expect(a.some((m) => m.loserTo === 'B flight')).toBe(true);
+      // the final and semi-finals are between players who have played twice already: their losers are out
+      expect(roundIn(plan, 'ev-A', 6).every((m) => !m.loserTo)).toBe(true);
+    });
+
+    it('the draw editor rebuilds the same draw from its lines', () => {
+      const { n, levelOf } = field([7, 12, 17, 12]);
+      const plan = draw('drop_flight', n, {}, { levelOf });
+      const lines = roundIn(plan, 'ev-A', 1).flatMap((m) =>
+        [m.srcA, m.srcB].map((x) => (x.kind === 'entry' ? x.entryId : ('BYE' as const))),
+      );
+      const ids = lines.filter((x): x is ID => x !== 'BYE');
+      const again = draw('drop_flight', n, {}, { levelOf, lines, entryIds: ids });
+      const shape = (p: DrawPlan) => p.matches.map((m) => [m.id, m.loserTo ?? '']).sort();
+      expect(wrong(again, entryIds(n), levelOf)).toEqual(wrong(plan, entryIds(n), levelOf));
+      expect(again.stages.map((s) => [s.flight, s.size])).toEqual(plan.stages.map((s) => [s.flight, s.size]));
+      expect(shape(again).filter(([id]) => id.startsWith('ev-A'))).toEqual(shape(plan).filter(([id]) => id.startsWith('ev-A')));
+    });
   });
 
   it('round robin, 16 entries with 4 of each level → every group gets one player of each level', () => {
