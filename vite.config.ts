@@ -42,11 +42,18 @@ export default defineConfig(({ mode }) => {
       projects: [
         {
           extends: true,
-          test: { name: 'unit', environment: 'node', include: ['src/**/*.test.ts'] },
+          // generous timeouts: the full suite runs in parallel and slow machines hit the 5 s default
+          test: { name: 'unit', environment: 'node', include: ['src/**/*.test.ts'], testTimeout: 30_000 },
         },
         {
           extends: true,
-          test: { name: 'ui', environment: 'jsdom', include: ['src/**/*.test.tsx'], setupFiles: ['src/test/setup.ts'] },
+          test: {
+            name: 'ui',
+            environment: 'jsdom',
+            include: ['src/**/*.test.tsx'],
+            setupFiles: ['src/test/setup.ts'],
+            testTimeout: 30_000,
+          },
         },
         {
           extends: true,

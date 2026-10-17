@@ -10,6 +10,7 @@ coverage
 # local environment (never commit secrets)
 .env
 .env.*
+!.env.player
 !.env.example
 
 # Supabase CLI local state

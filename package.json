@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:player": "vite --mode player",
     "build": "tsc -b && vite build",
     "build:artifact": "vite build --mode artifact && node scripts/make-artifact.mjs",
     "preview": "vite preview",
