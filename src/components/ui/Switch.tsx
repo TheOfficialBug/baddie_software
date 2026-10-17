@@ -26,7 +26,7 @@ export function Switch({
         aria-label={label}
         onClick={() => onChange(!on)}
         className={cn(
-          'tap-target relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-info',
+          'tap-target relative h-7 w-12 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
           on ? 'bg-fg' : 'bg-line-strong',
         )}
       >

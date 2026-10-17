@@ -84,6 +84,12 @@ export interface EventConfig {
    * byes; flights take byes in their Round 1. An odd field always gives the top seed a round-1 bye.
    */
   placementByes?: 'round1' | 'round2' | 'flights';
+  /**
+   * ABCD drop flight laid out like tournamentsoftware.com's "Triple Plate" (for draws imported from it):
+   * B (Plate) = A round-1 losers, C (Special Plate) = A round-2 losers, D (Consolation Plate) = B round-1
+   * losers, each loser on the line of the match they lost (no re-spreading), and all four flights kept.
+   */
+  layout?: 'tournamentsoftware';
   /** Scoring for the opening round only (e.g. one game to 30); later rounds use the event's rules. */
   firstRound?: RulesId;
 }

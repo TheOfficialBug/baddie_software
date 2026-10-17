@@ -8,6 +8,8 @@ import { fmtDate, fmtDateRange } from '@/lib/format';
 import { useLookup } from '@/data/lookup';
 import { registrationOpen } from '@/data/registration';
 
+import { useAccess } from '@/auth/useAccess';
+
 import { HelpButton } from '@/components/help/Help';
 import { NotFound } from '@/components/NotFound';
 import { NoticeBell } from '@/components/notices/Notices';
@@ -28,7 +30,10 @@ import type { TCtx } from '@/features/public/tournament/tournamentContext';
 export function TournamentLayout() {
   const { slug } = useParams();
   const lk = useLookup();
-  const t = lk.bySlug(slug);
+  const found = lk.bySlug(slug);
+  const access = useAccess();
+  // a draft is the organizers' work in progress: only their staff can open it until it's published
+  const t = found && (found.status !== 'draft' || access.roleIn(found.organizationId)) ? found : undefined;
   useDocumentTitle(t?.name ?? 'Tournament not found');
   if (!t)
     return (
@@ -62,7 +67,7 @@ export function TournamentLayout() {
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
               <BackButton tone="hero" />
-              <Logo tone="hero" />
+              <Logo tone="hero" compact />
             </div>
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
               {/* phones keep the bell and account; help and theme (which follows the system) need the room */}

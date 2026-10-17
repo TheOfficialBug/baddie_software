@@ -12,7 +12,7 @@ import type { Notice } from '@/data/types';
 import { useAccess } from '@/auth/useAccess';
 
 import { NOTICE_ICON, useNoticesFor } from '@/components/notices/useNotices';
-import { IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Empty } from '@/components/ui/Empty';
 import { Icon } from '@/components/ui/Icon';
@@ -44,6 +44,7 @@ export function NoticeBell({ tone = 'default', tournamentId }: { tone?: 'default
   const { playerId } = useAccess();
   const seenAt = useStore((s) => s.noticesSeenAt);
   const markSeen = useStore((s) => s.markNoticesSeen);
+  const clearNotices = useStore((s) => s.clearNotices);
   const list = useNoticesFor(playerId, tournamentId);
   const unread = list.filter((n) => n.at > seenAt).length;
   const [open, setOpen] = useState(false);
@@ -73,9 +74,17 @@ export function NoticeBell({ tone = 'default', tournamentId }: { tone?: 'default
         subtitle="Court calls and announcements from the tournament desk."
       >
         {list.length === 0 ? (
-          <Empty icon="bell" title="Nothing yet" body="When the desk calls your match or posts an announcement, it shows up here." />
+          <Empty icon="bell" title="All caught up" body="When the desk calls your match or posts an announcement, it shows up here." />
         ) : (
           <div className="flex flex-col gap-2.5">
+            <div className="-mt-1 flex items-center justify-between">
+              <span className="text-[13px] text-muted">
+                {list.length} notification{list.length === 1 ? '' : 's'}
+              </span>
+              <Button variant="ghost" size="sm" icon={<Icon name="check" size={16} />} onClick={clearNotices}>
+                Clear all
+              </Button>
+            </div>
             {list.map((n) => (
               <NoticeItem key={n.id} n={n} now={now} />
             ))}

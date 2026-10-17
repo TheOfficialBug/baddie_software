@@ -255,7 +255,7 @@ export function SeedingList({
             onChange={(e) => setPasted(e.target.value)}
             rows={6}
             placeholder={'1\tJason Ung\tA\n2\tPetro Takalo\tA\n…'}
-            className="num w-full rounded-xl border border-line bg-surface p-2.5 text-[13px] outline-none focus:border-info"
+            className="num w-full rounded-xl border border-line bg-surface p-2.5 text-[13px] outline-none focus:border-accent"
           />
           {pastePlan && (
             <div className="text-[13px]" aria-live="polite">
@@ -318,7 +318,7 @@ export function SeedingList({
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               placeholder={`Draft ${drafts.length + 1}`}
-              className="min-h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-3 text-[13px] outline-none focus:border-info"
+              className="min-h-9 min-w-0 flex-1 rounded-full border border-line bg-surface px-3 text-[13px] outline-none focus:border-accent"
             />
             <Button size="sm" variant="primary" type="submit">
               Save as draft
@@ -386,7 +386,7 @@ export function SeedingList({
                 'flex min-w-0 items-center gap-2 rounded-xl py-1 pl-1.5 pr-1',
                 seeded ? 'bg-sunken' : 'bg-surface',
                 dragIdx === i && 'opacity-40',
-                overIdx === i && dragIdx !== null && dragIdx !== i && 'ring-2 ring-info',
+                overIdx === i && dragIdx !== null && dragIdx !== i && 'ring-2 ring-accent',
                 i === seeds - 1 && i < order.length - 1 && 'mb-2',
               )}
             >

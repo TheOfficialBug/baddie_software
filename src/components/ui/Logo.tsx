@@ -19,7 +19,18 @@ export function ShuttleMark({ className, size = 34 }: { className?: string; size
   );
 }
 
-export function Logo({ to = '/', className, tone = 'default' }: { to?: string; className?: string; tone?: 'default' | 'hero' }) {
+/** `compact`: icon only on phones (the name shows from tablets up), for crowded top bars. */
+export function Logo({
+  to = '/',
+  className,
+  tone = 'default',
+  compact,
+}: {
+  to?: string;
+  className?: string;
+  tone?: 'default' | 'hero';
+  compact?: boolean;
+}) {
   return (
     <Link
       to={to}
@@ -27,7 +38,7 @@ export function Logo({ to = '/', className, tone = 'default' }: { to?: string; c
       aria-label={`${APP_NAME} home`}
     >
       <ShuttleMark />
-      <span className="hidden font-display text-[21px] font-extrabold 2xs:inline">{APP_NAME}</span>
+      <span className={cn('hidden font-display text-[21px] font-extrabold', compact ? 'sm:inline' : '2xs:inline')}>{APP_NAME}</span>
     </Link>
   );
 }

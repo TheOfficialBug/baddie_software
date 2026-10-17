@@ -113,7 +113,7 @@ export function Scores() {
                 onChange={(e) => setNum(e.target.value.replace(/[^\d]/g, ''))}
                 inputMode="numeric"
                 placeholder="Match number on the slip"
-                className="num min-h-11 w-full rounded-full border border-line bg-surface pl-8 pr-4 text-[15px] outline-none placeholder:font-sans placeholder:text-faint focus:border-info focus:ring-[3px] focus:ring-info/20"
+                className="num min-h-11 w-full rounded-full border border-line bg-surface pl-8 pr-4 text-[15px] outline-none placeholder:font-sans placeholder:text-faint focus:border-accent focus:ring-[3px] focus:ring-primary/25"
               />
             </label>
             <Button type="submit" variant="ink" disabled={!num}>

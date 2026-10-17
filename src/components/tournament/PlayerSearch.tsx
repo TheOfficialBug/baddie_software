@@ -71,7 +71,7 @@ export function PlayerSearch({
           aria-controls={listId}
           aria-activedescendant={hits[active] ? `${listId}-${active}` : undefined}
           aria-autocomplete="list"
-          className="min-h-11 w-full rounded-full border border-line bg-surface pl-10 pr-4 text-[15px] text-fg outline-none placeholder:text-faint focus:border-info focus:ring-[3px] focus:ring-info/25"
+          className="min-h-11 w-full rounded-full border border-line bg-surface pl-10 pr-4 text-[15px] text-fg outline-none placeholder:text-faint focus:border-accent focus:ring-[3px] focus:ring-primary/25"
         />
       </label>
       {q.trim() && (

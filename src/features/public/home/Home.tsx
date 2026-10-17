@@ -19,6 +19,9 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { SectionHead } from '@/components/ui/Section';
 
+import { featuredTournament } from '@/features/public/home/featured';
+import { Welcome } from '@/features/public/home/Welcome';
+
 export function Home() {
   useDocumentTitle('Badminton tournaments');
   const lk = useLookup();
@@ -29,6 +32,7 @@ export function Home() {
   // open for entries, or closed and waiting for the draw
   const open = lk.tournaments.filter((t) => (t.status === 'registration' || t.status === 'closed') && match(t));
   const done = lk.tournaments.filter((t) => t.status === 'completed' && match(t));
+  const featured = featuredTournament(lk);
   const firstLive = lk.tournaments.find((t) => t.status === 'live');
   const firstOpen = lk.tournaments.find((t) => registrationOpen(t));
 
@@ -56,6 +60,32 @@ export function Home() {
       cta: access.isOrganizer ? 'Open the organizer desk' : 'Get organizer access',
     },
   ];
+
+  // a tournament to welcome people to: the promotion homepage, then any other tournaments
+  if (featured && !q) {
+    const others = lk.tournaments.filter((t) => t.id !== featured.id && t.status !== 'draft');
+    return (
+      <div className="flex flex-col gap-12">
+        <Welcome t={featured} lk={lk} />
+        {others.length > 0 && (
+          <section>
+            <SectionHead title="More tournaments" />
+            <div className="grid gap-4 lg:grid-cols-2">
+              {others.map((t) => (
+                <TournamentCard key={t.id} lk={lk} t={t} />
+              ))}
+            </div>
+          </section>
+        )}
+        <p className="text-center text-[13px] text-muted">
+          Running the tournament?{' '}
+          <Link to={access.isOrganizer ? '/admin' : '/login?next=%2Fadmin'} className="font-semibold text-fg underline underline-offset-4">
+            {access.isOrganizer ? 'Open the organizer desk' : 'Organizer sign in'}
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-12">

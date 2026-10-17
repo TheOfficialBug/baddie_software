@@ -40,7 +40,7 @@ export function PublicShell() {
         <div className="mx-auto flex h-16 max-w-[1240px] items-center gap-2 px-4 sm:gap-6 sm:px-6">
           <div className="flex items-center gap-1">
             {!isHomePath(pathname) && <BackButton className="-ml-2" />}
-            <Logo />
+            <Logo compact />
           </div>
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
             {nav.map((n) => (

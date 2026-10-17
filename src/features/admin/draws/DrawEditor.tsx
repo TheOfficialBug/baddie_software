@@ -78,7 +78,27 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
     return () => clearTimeout(t);
   }, []);
 
-  const held = heldEntries(original, draft.seating);
+  const withdrawn = new Set(
+    lk
+      .entriesOf(ev.id)
+      .filter((e) => e.status === 'withdrawn')
+      .map((e) => e.id),
+  );
+  // taken out of the draw and not placed again (a withdrawn player may simply be left out)
+  const taken = heldEntries(original, draft.seating).filter((e) => !withdrawn.has(e));
+  // late entries: accepted after the draw was made, waiting for a place (a bye line or a withdrawn player's spot)
+  const inDraw = new Set(Object.values(original).filter(Boolean));
+  const seatedNow = new Set(Object.values(draft.seating).filter(Boolean));
+  const late = lk
+    .entriesOf(ev.id)
+    .filter((e) => e.status === 'accepted' && !inDraw.has(e.id))
+    .map((e) => e.id);
+  const latePlaced = late.filter((e) => seatedNow.has(e));
+  const held = [
+    ...taken,
+    ...late.filter((e) => !seatedNow.has(e)),
+    ...heldEntries(original, draft.seating).filter((e) => withdrawn.has(e)),
+  ];
   const byesMoved = movesByes(original, draft.seating);
   // lines left with nobody in them (both places empty)
   const emptyLines = places.boxes
@@ -86,6 +106,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
     .filter((b) => b.places.some((p) => original[p.key]))
     .map((b) => b.title);
   const moved = movedEntries(original, draft.seating);
+  const changes = moved.filter((m) => m.to || !withdrawn.has(m.entryId)).length + latePlaced.length;
   const boxOf = (key: string) => places.boxes.find((b) => b.places.some((p) => p.key === key));
   const where = (key: string) => {
     const b = boxOf(key);
@@ -282,7 +303,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
     }
   })();
 
-  const dirty = moved.length > 0 || held.length > 0 || !!savedDraft;
+  const dirty = changes > 0 || held.length > 0 || !!savedDraft;
   const save = () => {
     saveDraft(ev.id, sig, draft.seating, userId);
     clearDraft();
@@ -291,7 +312,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
 
   // Later rounds preview the new seating once everyone is placed (byes carry the new players on).
   const preview = useMemo(() => {
-    if (held.length || !moved.length) return lk;
+    if (taken.length || !changes) return lk;
     const r = rearrangeDraw(selectDB(useStore.getState()), ev.id, draft.seating);
     return r.db ? makeLookup(r.db) : lk;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -352,11 +373,11 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
         <Button
           size="sm"
           variant="primary"
-          disabled={!moved.length || held.length > 0}
-          title={held.length ? 'Place everyone from the holding area first' : undefined}
+          disabled={!changes || taken.length > 0}
+          title={taken.length ? 'Place everyone from the holding area first' : undefined}
           onClick={() => setPending({ kind: 'publish' })}
         >
-          Publish{moved.length ? ` ${moved.length}` : ''} {moved.length === 1 ? 'change' : 'changes'}
+          Publish{changes ? ` ${changes}` : ''} {changes === 1 ? 'change' : 'changes'}
         </Button>
       </div>
     </div>

@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite",
     "dev:player": "vite --mode player",
+    "dev:scenario": "vite --mode scenario",
+    "dev:organizer": "vite --mode organizer",
     "build": "tsc -b && vite build",
     "build:artifact": "vite build --mode artifact && node scripts/make-artifact.mjs",
     "preview": "vite preview",

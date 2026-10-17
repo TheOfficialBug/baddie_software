@@ -620,3 +620,45 @@ describe('generateDraw · level-aware pairing', () => {
     expect(plan.groups.map((g) => g.entryIds.length)).toEqual([4, 4]);
   });
 });
+
+describe('drop flight laid out like tournamentsoftware (Triple Plate)', () => {
+  // the real Men's Singles: 64 lines, 49 players; P = player, b = bye (pairs of lines are round-1 matches)
+  const PATTERN = 'Pb Pb PP Pb PP bP PP PP PP Pb Pb Pb PP PP PP PP Pb Pb Pb Pb PP PP PP PP Pb Pb Pb Pb PP PP PP PP';
+  const lines: (ID | 'BYE')[] = [];
+  let n = 0;
+  for (const ch of PATTERN.replace(/ /g, '')) lines.push(ch === 'P' ? `e${++n}` : 'BYE');
+  const plan = draw('drop_flight', n, { variant: 'ABCD', layout: 'tournamentsoftware' }, { entryIds: entryIds(n), lines });
+  const stage = (f: string) => plan.stages.find((s) => s.flight === f)!;
+  const a1 = roundIn(plan, stage('A').id, 1);
+
+  it('keeps all four flights at tournamentsoftware sizes for A, B (Plate) and D (Consolation Plate)', () => {
+    expect(plan.stages.map((s) => s.flight)).toEqual(['A', 'B', 'C', 'D']);
+    expect(stageSizes(plan)).toMatchObject({ A: 64, B: 32, D: 16 });
+  });
+
+  it('B (Plate): line i is the loser of A round-1 match i, byes where A had a bye', () => {
+    const b = round1Lines(plan, stage('B').id);
+    a1.forEach((m, i) => {
+      if (isReal(m)) expect(b[i]).toEqual({ kind: 'loser', matchId: m.id });
+      else expect(b[i].kind).toBe('bye');
+    });
+  });
+
+  it('C (Special Plate) takes A round-2 losers; D (Consolation Plate) takes B round-1 losers, in place', () => {
+    const a2 = roundIn(plan, stage('A').id, 2);
+    const c = round1Lines(plan, stage('C').id).filter((s) => s.kind === 'loser');
+    expect(c.map((s) => (s as { matchId: ID }).matchId).every((id) => a2.some((m) => m.id === id))).toBe(true);
+    const b1 = roundIn(plan, stage('B').id, 1);
+    const d = round1Lines(plan, stage('D').id);
+    b1.forEach((m, i) => expect(d[i].kind).toBe(isReal(m) ? 'loser' : 'bye'));
+  });
+
+  it('keeps the flights even when almost every first-round line is a bye (the real Men’s Doubles)', () => {
+    const md: (ID | 'BYE')[] = [];
+    let k = 0;
+    for (let i = 0; i < 32; i++) md.push(`e${++k}`, i === 29 ? `e${++k}` : 'BYE');
+    const p = draw('drop_flight', k, { variant: 'ABCD', layout: 'tournamentsoftware' }, { entryIds: entryIds(k), lines: md });
+    expect(p.stages.map((s) => s.flight)).toEqual(expect.arrayContaining(['A', 'C']));
+    expect(p.warnings.join(' ')).not.toMatch(/uses A\/B instead/);
+  });
+});

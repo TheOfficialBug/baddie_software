@@ -222,7 +222,7 @@ function ScoreBox({
           }
         }}
         className={cn(
-          'num rounded-[10px] text-center font-semibold outline-none transition-shadow placeholder:text-current placeholder:opacity-60 focus:ring-[3px] focus:ring-info/40',
+          'num rounded-[10px] text-center font-semibold outline-none transition-shadow placeholder:text-current placeholder:opacity-60 focus:ring-[3px] focus:ring-primary/40',
           error && 'ring-2 ring-live',
           className,
         )}

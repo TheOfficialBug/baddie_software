@@ -46,6 +46,8 @@ export default {
         warn: v('warn'),
         'warn-soft': v('warn-soft'),
         gold: v('gold'),
+        'glow-a': v('glow-a'),
+        'glow-b': v('glow-b'),
         hero: v('hero'),
         'hero-fg': v('hero-fg'),
         'hero-muted': v('hero-muted'),

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/useConfirm';
 
+import { PublishButton } from '@/features/admin/PublishButton';
 import { type Progress, type StageIndex, STAGES } from '@/features/admin/run/stages';
 
 /**
@@ -48,7 +49,12 @@ export function StageBar({
 
   // The one thing to do next at the current stage.
   let next: { text: ReactNode; action?: ReactNode } = { text: '' };
-  if (t.status === 'draft')
+  if (t.status === 'draft' && p.events.length && p.drawn.length === p.events.length)
+    next = {
+      text: "The draws are in. Players can't see this tournament yet: check the draws, then publish.",
+      action: <PublishButton t={t} canPublish={canStage} />,
+    };
+  else if (t.status === 'draft')
     next = {
       text: "Players can't see this tournament yet. Open registration when you're ready for entries.",
       action: canStage && (

@@ -116,7 +116,9 @@ export function rearrangeDraw(db: DB, eventId: ID, draft: Seating): OpResult {
   const p = drawPlaces(db, eventId);
   const original = seatingOf(p);
   const keys = Object.keys(original);
-  if (heldEntries(original, draft).length) return { error: 'Place everyone from the holding area first.' };
+  // a withdrawn player may be left out; anyone else taken out must be placed again
+  const withdrawn = new Set(db.entries.filter((e) => e.eventId === eventId && e.status === 'withdrawn').map((e) => e.id));
+  if (heldEntries(original, draft).some((e) => !withdrawn.has(e))) return { error: 'Place everyone from the holding area first.' };
   const placed = keys.map((k) => draft[k]).filter(Boolean);
   if (new Set(placed).size !== placed.length) return { error: 'Each player can only be in one place.' };
   const changed = keys.filter((k) => draft[k] !== original[k]);

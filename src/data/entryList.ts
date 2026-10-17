@@ -96,7 +96,7 @@ const words = (s: string) =>
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
-const norm = (s: string) => words(s).join(' ');
+export const norm = (s: string) => words(s).join(' ');
 
 /** Edit distance where swapping two neighbouring letters counts once. */
 function distance(a: string, b: string): number {

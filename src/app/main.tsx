@@ -23,6 +23,10 @@ if (env.supabase) startRemoteSync();
 else startCrossTabSync();
 // `npm run dev:player`: the public pages on a simulated match day (dev server only, never in a build)
 if (import.meta.env.DEV && import.meta.env.MODE === 'player') void import('@/dev/playerPreview').then((m) => m.startPlayerPreview());
+// `npm run dev:scenario`: the same, on a real tournamentsoftware draws file kept in local/ (never committed)
+if (import.meta.env.DEV && import.meta.env.MODE === 'scenario') void import('@/dev/scenario').then((m) => m.startScenario());
+// `npm run dev:organizer`: those draws in draft, nothing played, for running the tournament from the desk
+if (import.meta.env.DEV && import.meta.env.MODE === 'organizer') void import('@/dev/scenario').then((m) => m.startOrganizer());
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element in index.html');

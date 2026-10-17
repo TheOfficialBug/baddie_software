@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import type { TEvent, Tournament } from '@/engine/types';
 
 import type { Lookup } from '@/data/lookup';
@@ -11,6 +13,7 @@ import { Button, ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { useConfirm } from '@/components/ui/useConfirm';
 
+import { ImportDrawsDialog } from '@/features/admin/draws/ImportDrawsDialog';
 import { resetDrawOptions } from '@/features/admin/draws/resetOptions';
 import { EventRow } from '@/features/admin/run/EventRow';
 import { formatName, type Progress } from '@/features/admin/run/stages';
@@ -22,6 +25,7 @@ export function DrawsStage({ lk, t, p }: { lk: Lookup; t: Tournament; p: Progres
   const resetDraw = useStore((s) => s.resetEventDraw);
   const drafts = useStore((s) => s.drawDrafts);
   const { ask, dialog } = useConfirm();
+  const [importing, setImporting] = useState(false);
   const canDraw = access.can('manage_draws', t.organizationId);
   const base = `/admin/t/${t.id}/draws`;
 
@@ -117,9 +121,15 @@ export function DrawsStage({ lk, t, p }: { lk: Lookup; t: Tournament; p: Progres
             </span>
           </p>
         </div>
+        {canDraw && (
+          <Button size="sm" icon={<Icon name="upload" size={16} />} onClick={() => setImporting(true)}>
+            Import from tournamentsoftware
+          </Button>
+        )}
       </div>
       <ul className="panel divide-y divide-line">{p.events.map(row)}</ul>
       {dialog}
+      {importing && <ImportDrawsDialog t={t} onClose={() => setImporting(false)} />}
     </section>
   );
 }

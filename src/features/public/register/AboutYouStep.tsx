@@ -100,7 +100,7 @@ export function AboutYouStep({ t, me, setMe, errors, emailLocked }: Props) {
                 <label
                   key={g.value}
                   className={cn(
-                    'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] px-4 py-2.5 transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-info/40',
+                    'flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] px-4 py-2.5 transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-primary/40',
                     on ? 'border-fg bg-surface' : cn('hover:border-fg/40', errors.gender ? 'border-live/50' : 'border-line'),
                   )}
                 >

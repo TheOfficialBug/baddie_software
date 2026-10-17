@@ -82,22 +82,28 @@ export function previewStep(db: DB, tid: ID, now: number, rand: () => number, st
 }
 
 /** Start the preview in the running app (dev server only). Returns a stop function. */
-export async function startPlayerPreview(): Promise<() => void> {
+export async function startPlayerPreview(
+  opts: { build: () => DB; slug: string; isCurrent?: (db: DB) => boolean; simulate?: boolean } = {
+    build: () => buildPreview(),
+    slug: PREVIEW_SLUG,
+  },
+): Promise<() => void> {
   const [{ useStore }, { mountPreviewBar }] = await Promise.all([import('@/data/store'), import('@/dev/mountPreviewBar')]);
-  const reset = () => useStore.setState({ ...buildPreview(), noticesSeenAt: 0 });
-  reset();
+  const reset = () => useStore.setState({ ...opts.build(), noticesSeenAt: 0 });
   const rand = mulberry32(Date.now() % 2_147_483_647);
-  const tid = () => useStore.getState().tournaments.find((t) => t.slug === PREVIEW_SLUG)?.id;
+  const tid = () => useStore.getState().tournaments.find((t) => t.slug === opts.slug)?.id;
+  // a reload carries on with the same match day (links stay valid); Reset starts a fresh one
+  if (!tid() || (opts.isCurrent && !opts.isCurrent(useStore.getState()))) reset();
   let step = 0;
   let paused = false;
   const timer = setInterval(() => {
     const id = tid();
-    if (paused || !id) return;
+    if (paused || !id || opts.simulate === false) return;
     const s = useStore.getState();
     useStore.setState(previewStep(s, id, Date.now(), rand, ++step));
   }, 1500);
   const unmount = mountPreviewBar({
-    slug: PREVIEW_SLUG,
+    slug: opts.slug,
     togglePause: () => (paused = !paused),
     reset,
   });

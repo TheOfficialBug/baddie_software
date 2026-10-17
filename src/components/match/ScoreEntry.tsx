@@ -222,7 +222,7 @@ export function ScoreForm({
                   value={quick}
                   onChange={(e) => applyQuick(e.target.value)}
                   placeholder={`Or type it: ${rules.bestOf === 1 ? `${rules.pointsToWin}-15` : `${rules.pointsToWin}-15 18-${rules.pointsToWin} ${rules.pointsToWin}-19`}`}
-                  className="min-h-11 w-full rounded-full border border-line bg-bg pl-10 pr-4 text-[15px] outline-none placeholder:text-faint focus:border-info focus:ring-[3px] focus:ring-info/20"
+                  className="min-h-11 w-full rounded-full border border-line bg-bg pl-10 pr-4 text-[15px] outline-none placeholder:text-faint focus:border-accent focus:ring-[3px] focus:ring-primary/25"
                 />
               </label>
 
@@ -258,7 +258,7 @@ export function ScoreForm({
                             onChange={(e) => setCell(gi, s, e.target.value)}
                             onFocus={(e) => e.target.select()}
                             className={cn(
-                              'num h-[60px] w-full max-w-[76px] rounded-[14px] border-[1.5px] bg-bg text-center text-[26px] font-semibold outline-none transition-colors focus:border-info focus:ring-[3px] focus:ring-info/20',
+                              'num h-[60px] w-full max-w-[76px] rounded-[14px] border-[1.5px] bg-bg text-center text-[26px] font-semibold outline-none transition-colors focus:border-accent focus:ring-[3px] focus:ring-primary/25',
                               bad ? 'border-live bg-live-soft' : good ? 'border-ok' : 'border-line',
                             )}
                           />

@@ -9,6 +9,8 @@ import { useThemePref } from '@/lib/theme';
 import { useLookup } from '@/data/lookup';
 import { useQueue } from '@/data/queries';
 
+import { useAccess } from '@/auth/useAccess';
+
 import { CourtCard } from '@/components/match/CourtCard';
 import { matchContext } from '@/components/match/matchInfo';
 import { NotFound } from '@/components/NotFound';
@@ -22,7 +24,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 export function TVMode() {
   const { slug } = useParams();
   const lk = useLookup();
-  const t = lk.bySlug(slug);
+  const found = lk.bySlug(slug);
+  const access = useAccess();
+  // drafts stay with the organizers' staff until published
+  const t = found && (found.status !== 'draft' || access.roleIn(found.organizationId)) ? found : undefined;
   useDocumentTitle('TV', t?.name);
   const now = useNow(5000);
   const pref = useThemePref();

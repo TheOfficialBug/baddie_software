@@ -148,7 +148,7 @@ export function DrawCanvas({
           // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the canvas scrolls with the arrow keys
           tabIndex={0}
           className={cn(
-            'scroll-thin overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-info lg:cursor-grab',
+            'scroll-thin overflow-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent lg:cursor-grab',
             // as tall as the window allows (header and bottom bar aside); the whole window in full screen
             full ? 'h-full' : 'h-[max(420px,calc(100dvh-170px))]',
           )}

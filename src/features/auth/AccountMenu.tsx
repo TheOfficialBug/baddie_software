@@ -6,11 +6,10 @@ import { cn } from '@/lib/cn';
 import { toast } from '@/data/toast';
 
 import { authActions } from '@/auth/authStore';
-import { loginPath } from '@/auth/redirects';
 import { useAccess } from '@/auth/useAccess';
 
+import { WaitlistButton } from '@/components/promo/WaitlistButton';
 import { Avatar } from '@/components/ui/Avatar';
-import { ButtonLink } from '@/components/ui/Button';
 import { Icon, type IconName } from '@/components/ui/Icon';
 
 /** Header account control: "Sign in" when signed out, otherwise an avatar that opens the account menu. */
@@ -38,17 +37,8 @@ export function AccountMenu({ tone = 'default', className }: { tone?: 'default' 
 
   if (status === 'loading') return <span className="h-10 w-10" aria-hidden />;
   if (!user) {
-    return (
-      <ButtonLink
-        to={loginPath(loc.pathname + loc.search)}
-        size="sm"
-        variant={tone === 'hero' ? 'onHero' : 'secondary'}
-        icon={<Icon name="login" size={16} />}
-        className={cn('touch:min-h-11', className)}
-      >
-        Sign in
-      </ButtonLink>
-    );
+    // visitors get the waitlist; organizers sign in from the homepage link or /login
+    return <WaitlistButton size="sm" from="header" className={className} />;
   }
 
   const item = (to: string, icon: IconName, label: string) => (

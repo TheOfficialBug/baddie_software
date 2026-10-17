@@ -289,6 +289,41 @@ function feederBracket(eventId: ID, key: string, name: string, order: number, fl
   return { stage, matches: buildBracket(stage, lines) };
 }
 
+/** A flight fed in place: line i is the loser of feeder match i (tournamentsoftware keeps draw positions). */
+function positionalFeeder(eventId: ID, key: string, name: string, order: number, flight: Stage['flight'], feeders: Match[], label: string) {
+  if (realMatches(feeders).length < 1) return null;
+  const real = new Set(realMatches(feeders).map((m) => m.id));
+  const size = Math.max(2, nextPow2(feeders.length));
+  const lines: SlotSource[] = Array.from({ length: size }, (_, i) => {
+    const m = feeders[i];
+    if (!m || !real.has(m.id)) return { kind: 'bye' };
+    m.loserTo = label;
+    return { kind: 'loser', matchId: m.id };
+  });
+  const stage = makeStage(eventId, key, name, order, size, flight);
+  return { stage, matches: buildBracket(stage, lines) };
+}
+
+/** tournamentsoftware "Triple Plate": Plate (B), Special Plate (C), Consolation Plate (D), all in draw position. */
+function triplePlate(eventId: ID, aMatches: Match[]): { stages: Stage[]; matches: Match[]; warnings: string[] } {
+  const byIndex = (ms: Match[]) => [...ms].sort((a, b) => a.index - b.index);
+  const out = { stages: [] as Stage[], matches: [] as Match[], warnings: [] as string[] };
+  const B = positionalFeeder(eventId, 'B', 'B flight', 1, 'B', byIndex(roundOf(aMatches, 1)), 'B flight');
+  const C = positionalFeeder(eventId, 'C', 'C flight', 2, 'C', byIndex(roundOf(aMatches, 2)), 'C flight');
+  const D = B ? positionalFeeder(eventId, 'D', 'D flight', 3, 'D', byIndex(roundOf(B.matches, 1)), 'D flight') : null;
+  for (const [f, key] of [
+    [B, 'B'],
+    [C, 'C'],
+    [D, 'D'],
+  ] as const) {
+    if (f) {
+      out.stages.push(f.stage);
+      out.matches.push(...f.matches);
+    } else out.warnings.push(`Nobody can drop into the ${key} flight with this draw (too many byes).`);
+  }
+  return out;
+}
+
 /**
  * Drop flight. Everyone starts in A.
  *   ABCD (triple elimination): A round-1 losers → C · A round-2 losers → B · C round-1 losers → D.
@@ -310,6 +345,11 @@ function dropFlightDraw(input: DrawInput): DrawPlan {
   const matches = [...aMatches];
   const aR1 = roundOf(aMatches, 1);
   const realR1 = realMatches(aR1).length;
+
+  if (event.config.variant === 'ABCD' && event.config.layout === 'tournamentsoftware') {
+    const tp = triplePlate(event.id, aMatches);
+    return { stages: [...stages, ...tp.stages], groups: [], matches: [...matches, ...tp.matches], warnings: [...warnings, ...tp.warnings] };
+  }
 
   let variant = event.config.variant;
   if (variant === 'ABCD' && (realR1 < 4 || S < 8)) {

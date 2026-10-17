@@ -58,7 +58,7 @@ export function LevelPicker({
               key={s.value}
               className={cn(
                 'relative flex min-h-[92px] cursor-pointer flex-col gap-1.5 rounded-2xl border-[1.5px] p-3 transition-[background-color,border-color,transform] duration-150 active:scale-[0.98]',
-                'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-info/40',
+                'has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-primary/40',
                 on
                   ? 'border-primary bg-primary text-primary-fg shadow-lift'
                   : cn('bg-surface hover:border-fg/40', error ? 'border-live/50' : 'border-line'),

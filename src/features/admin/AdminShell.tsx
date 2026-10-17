@@ -28,6 +28,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 import { AdminContext } from '@/features/admin/adminContext';
 import { CommandPalette } from '@/features/admin/CommandPalette';
+import { PublishButton } from '@/features/admin/PublishButton';
 import { NoAccess } from '@/features/auth/guards';
 
 type NavItem = { to: string; label: string; icon: IconName; end?: boolean; badge?: number; live?: boolean; cap?: Capability };
@@ -347,7 +348,8 @@ export function AdminShell() {
                   <kbd className="num hidden rounded-md bg-sunken px-1.5 text-[11px] font-semibold lg:inline">Ctrl K</kbd>
                 </button>
               )}
-              <div className={cn('flex items-center gap-1', !(t && role) && 'ml-auto', t && role && 'lg:ml-auto')}>
+              <div className={cn('flex items-center gap-1.5', !(t && role) && 'ml-auto', t && role && 'lg:ml-auto')}>
+                {t && role && <PublishButton t={t} canPublish={access.can('manage_settings', t.organizationId)} />}
                 <HelpButton audience="admin" />
               </div>
             </div>

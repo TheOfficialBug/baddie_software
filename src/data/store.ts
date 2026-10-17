@@ -21,11 +21,14 @@ import * as resets from '@/data/resets';
 import { buildIowaOpen } from '@/data/seed/iowaOpen';
 import * as sim from '@/data/simulate';
 import { toast } from '@/data/toast';
+import { importTsDraws, type TsDrawFile, type TsImportResult } from '@/data/tsDraws';
 import { type DB, emptyDB, type Notice, type Profile, type RegistrationPick, type Role } from '@/data/types';
 
 interface ViewerState {
   /** Timestamp of the newest notice the viewer has opened. */
   noticesSeenAt: number;
+  /** Notifications up to this time were cleared on this device ("Clear all"). */
+  noticesClearedAt: number;
 }
 
 interface Actions {
@@ -39,6 +42,8 @@ interface Actions {
   removeMember: (orgId: ID, userId: ID) => string | null;
   // viewer
   markNoticesSeen: () => void;
+  /** Hide every notification so far on this device; new ones still arrive. */
+  clearNotices: () => void;
   resetDemo: () => void;
   // notices
   sendNotice: (n: Omit<Notice, 'id' | 'at'>) => void;
@@ -59,6 +64,8 @@ interface Actions {
   register: (tid: ID, playerId: ID, picks: RegistrationPick[], total: number) => void;
   /** Replace the tournament's entries with an imported entry list. Returns what was done (or why not). */
   importEntryList: (tid: ID, list: EntryList) => ImportPlan;
+  /** Load the draws published on tournamentsoftware.com (same first round), replacing those events' entries and draws. */
+  importTsDraws: (tid: ID, file: TsDrawFile) => TsImportResult;
   // draws
   publishDraw: (eventId: ID, plan: DrawPlan, rngSeed: number, seedOrder: ID[]) => void;
   clearDraw: (eventId: ID) => void;
@@ -133,7 +140,7 @@ const DB_KEYS = Object.keys(emptyDB()) as (keyof DB)[];
 export const selectDB = (s: DB): DB => Object.fromEntries(DB_KEYS.map((k) => [k, s[k]])) as unknown as DB;
 
 /** With Supabase the data comes from the database (see ./remote), so the app starts empty; demo mode starts with the sample tournament. */
-const freshState = (): DB & ViewerState => ({ ...(env.supabase ? emptyDB() : buildIowaOpen()), noticesSeenAt: 0 });
+const freshState = (): DB & ViewerState => ({ ...(env.supabase ? emptyDB() : buildIowaOpen()), noticesSeenAt: 0, noticesClearedAt: 0 });
 
 export const useStore = create<State>()(
   persist(
@@ -173,6 +180,7 @@ export const useStore = create<State>()(
           return r.error ?? null;
         },
         markNoticesSeen: () => set({ noticesSeenAt: Date.now() }),
+        clearNotices: () => set({ noticesSeenAt: Date.now(), noticesClearedAt: Date.now() }),
         resetDemo: () => {
           if (env.supabase) return;
           set(freshState());
@@ -233,6 +241,11 @@ export const useStore = create<State>()(
           const plan = planImport(db(), tid, list);
           if (!plan.blocked) commit(applyImport(db(), tid, plan));
           return plan;
+        },
+        importTsDraws: (tid, file) => {
+          const r = importTsDraws(db(), tid, file);
+          if (r.db) commit(r.db);
+          return r;
         },
 
         publishDraw: (eventId, plan, rngSeed, seedOrder) => {
@@ -412,7 +425,7 @@ export const useStore = create<State>()(
       })),
       // Persist data and viewer preferences only; actions are recreated on load.
       partialize: (s) => {
-        const out: Partial<State> = { noticesSeenAt: s.noticesSeenAt };
+        const out: Partial<State> = { noticesSeenAt: s.noticesSeenAt, noticesClearedAt: s.noticesClearedAt };
         if (!env.supabase) for (const k of DB_KEYS) Object.assign(out, { [k]: s[k] });
         return out;
       },

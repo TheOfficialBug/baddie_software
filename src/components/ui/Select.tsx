@@ -194,7 +194,7 @@ export function Select({
             show();
           }
         }}
-        className={cn('field flex items-center gap-2 text-left', open && 'border-info ring-[3px] ring-info/20', className)}
+        className={cn('field flex items-center gap-2 text-left', open && 'border-accent ring-[3px] ring-primary/25', className)}
       >
         <span className={cn('min-w-0 flex-1 truncate', !selected && 'text-faint')}>
           {selected ? (renderValue ? renderValue(selected.value) : selected.label) : placeholder}

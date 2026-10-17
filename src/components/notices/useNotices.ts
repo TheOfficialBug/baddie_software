@@ -21,10 +21,12 @@ export function useNoticesFor(playerId: ID | null, tournamentId?: ID) {
   const notices = useStore((s) => s.notices);
   const entries = useStore((s) => s.entries);
   const events = useStore((s) => s.events);
+  const clearedAt = useStore((s) => s.noticesClearedAt ?? 0);
   return useMemo(() => {
     const myEvents = new Set(entries.filter((e) => playerId && e.playerIds.includes(playerId)).map((e) => e.eventId));
     const myTournaments = new Set(events.filter((e) => myEvents.has(e.id)).map((e) => e.tournamentId));
     return notices
+      .filter((n) => n.at > clearedAt)
       .filter((n) => (tournamentId ? n.tournamentId === tournamentId : !playerId || myTournaments.has(n.tournamentId)))
       .filter((n) => {
         if (n.audience === 'all') return true;
@@ -33,5 +35,5 @@ export function useNoticesFor(playerId: ID | null, tournamentId?: ID) {
         return !!n.playerIds?.includes(playerId);
       })
       .sort((a, b) => b.at - a.at);
-  }, [notices, entries, events, playerId, tournamentId]);
+  }, [notices, entries, events, playerId, tournamentId, clearedAt]);
 }

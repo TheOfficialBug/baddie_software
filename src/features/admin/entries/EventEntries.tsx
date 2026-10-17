@@ -127,7 +127,7 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
             { value: 'withdrawn', label: 'Withdrawn', count: entries.filter((e) => e.status === 'withdrawn').length },
           ]}
         />
-        <Button className="ml-auto" icon={<Icon name="userAdd" size={18} />} onClick={() => setAdding(true)} disabled={locked}>
+        <Button className="ml-auto" icon={<Icon name="userAdd" size={18} />} onClick={() => setAdding(true)}>
           Add entry
         </Button>
       </div>
@@ -156,7 +156,8 @@ export function EventEntries({ lk, t, ev, onEdit }: { lk: Lookup; t: Tournament;
         <p className="flex items-start gap-2 rounded-2xl bg-sunken p-4 text-[14px] text-muted">
           <Icon name="info" size={18} className="mt-0.5 text-fg" />
           <span>
-            The draw is published, so entries are locked. If someone pulls out now, give their opponent a walkover on the{' '}
+            The draw is published. A late entry you add waits in the draw editor&apos;s holding area (View draw, then Edit) until you give
+            it a bye or a withdrawn player&apos;s place. If someone pulls out, withdraw them below, or give their opponent a walkover on the{' '}
             <Link to={`/admin/t/${t.id}/scores`} className="font-semibold text-fg underline underline-offset-2">
               Scores
             </Link>{' '}

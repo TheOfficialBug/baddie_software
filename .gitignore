@@ -11,6 +11,9 @@ coverage
 .env
 .env.*
 !.env.player
+!.env.scenario
+!.env.organizer
+!.env.test
 !.env.example
 
 # Supabase CLI local state
@@ -28,3 +31,6 @@ Thumbs.db
 
 .vercel
 .claude/settings.local.json
+
+# real tournament files for dev:scenario (names of real players): never committed
+/local/

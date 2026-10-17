@@ -11,7 +11,8 @@ const link = 'rounded-full px-2.5 py-1 font-semibold hover:bg-white/15';
 /** Floating dev bar for the player preview: jump to the pages players use, pause the simulation, start over. */
 export function PreviewBar({ slug, togglePause, reset }: PreviewBarProps) {
   const [paused, setPaused] = useState(false);
-  const [open, setOpen] = useState(true);
+  // phones: start as a small pill so the bar never covers the tab bar
+  const [open, setOpen] = useState(() => window.innerWidth >= 768);
   const t = `/t/${slug}`;
   if (!open)
     return (
