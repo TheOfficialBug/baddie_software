@@ -196,18 +196,40 @@ describe('drop flight by results (placement rounds)', () => {
     expect(again.matches.map((m) => [m.id, m.index, m.srcA, m.srcB])).toEqual(plan.matches.map((m) => [m.id, m.index, m.srcA, m.srcB]));
   });
 
-  it('follows the seeding order as given, not re-sorted by level', () => {
-    // organizer put C1 above B1 in the seeding order
-    const ids = ['A1', 'A2', 'C1', 'B1', 'B2', 'C2', 'D1', 'D2'];
+  it('every C/D entry plays an A/B entry in round 1; the seeding order holds within A/B and within C/D', () => {
+    // organizer put B1 above A2, and C1 above B2
+    const ids = ['A1', 'B1', 'A2', 'C1', 'B2', 'C2', 'D1', 'D2'];
     const r = play(make(ids, undefined, 0), ids);
-    expect(r.games('Round 1')).toEqual(['A1-B2', 'A2-C2', 'C1-D1', 'B1-D2']);
+    expect(r.games('Round 1')).toEqual(['A1-C1', 'B1-C2', 'A2-D1', 'B2-D2']);
   });
 
-  it('48 entries (12 per level), byes in round 1 (default): the top 16 skip round 1; flights 16/16/8/8 with no byes', () => {
+  it('48 entries (12 per level): no round-1 byes, so all 24 round-1 matches are A/B v C/D; flights of 12', () => {
     const ids = Array.from({ length: 48 }, (_, i) => `${'ABCD'[Math.floor(i / 12)]}${(i % 12) + 1}`);
     const plan = make(ids);
+    expect(r1Byes(plan)).toEqual([]);
+    const low = (s: SlotSource) => s.kind === 'entry' && 'CD'.includes(s.entryId[0]);
+    const r1 = inStage(plan, 'Round 1');
+    expect(r1).toHaveLength(24);
+    expect(r1.every((m) => low(m.srcA) !== low(m.srcB))).toBe(true);
+    expect(inStage(plan, 'Round 2 upper')).toHaveLength(12);
+    expect(inStage(plan, 'Round 2 lower')).toHaveLength(12);
+    expect(plan.stages.filter((s) => s.flight).map((s) => s.size)).toEqual([16, 16, 16, 16]);
+    expect(plan.warnings).toEqual([]);
+  });
+
+  it('48 entries, 32 A/B and 16 C/D, byes in round 1 (default): the top 16 skip round 1; flights 16/16/8/8 with no byes', () => {
+    const ids = [
+      ...Array.from({ length: 16 }, (_, i) => `A${i + 1}`),
+      ...Array.from({ length: 16 }, (_, i) => `B${i + 1}`),
+      ...Array.from({ length: 8 }, (_, i) => `C${i + 1}`),
+      ...Array.from({ length: 8 }, (_, i) => `D${i + 1}`),
+    ];
+    const plan = make(ids);
     expect(r1Byes(plan).sort()).toEqual(ids.slice(0, 16).sort());
-    expect(inStage(plan, 'Round 1').filter((m) => m.srcA.kind !== 'bye' && m.srcB.kind !== 'bye')).toHaveLength(16);
+    const low = (s: SlotSource) => s.kind === 'entry' && 'CD'.includes(s.entryId[0]);
+    const played = inStage(plan, 'Round 1').filter((m) => m.srcA.kind !== 'bye' && m.srcB.kind !== 'bye');
+    expect(played).toHaveLength(16);
+    expect(played.every((m) => low(m.srcA) !== low(m.srcB))).toBe(true);
     expect(inStage(plan, 'Round 2 upper')).toHaveLength(16);
     expect(inStage(plan, 'Round 2 lower')).toHaveLength(8);
     expect(plan.stages.filter((s) => s.flight).map((s) => s.size)).toEqual([16, 16, 8, 8]);
@@ -217,6 +239,14 @@ describe('drop flight by results (placement rounds)', () => {
     const r1 = [...inStage(plan, 'Round 1')].sort((a, b) => a.index - b.index);
     expect(r1[0].srcA).toEqual({ kind: 'entry', entryId: 'A1' });
     expect(r1[r1.length - 1].srcA).toEqual({ kind: 'entry', entryId: 'A2' });
+  });
+
+  it('more C/D than A/B entries: only the unavoidable C/D v C/D matches, with a warning', () => {
+    const ids = ['A1', 'B1', 'B2', 'C1', 'C2', 'C3', 'D1', 'D2', 'D3', 'D4'];
+    const plan = make(ids, undefined, 0);
+    const low = (s: SlotSource) => s.kind === 'entry' && 'CD'.includes(s.entryId[0]);
+    expect(inStage(plan, 'Round 1').filter((m) => low(m.srcA) && low(m.srcB))).toHaveLength(2);
+    expect(plan.warnings.join(' ')).toMatch(/2 round-1 matches are between two C\/D entries/);
   });
 
   it('48 entries, byes in the flights: everyone plays both placement rounds; flights of 12 with 4 byes in Round 1', () => {

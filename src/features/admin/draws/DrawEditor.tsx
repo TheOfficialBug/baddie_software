@@ -8,7 +8,19 @@ import { cn } from '@/lib/cn';
 import { fmtAgo } from '@/lib/format';
 
 import { type Lookup, makeLookup } from '@/data/lookup';
-import { drawPlaces, heldEntries, movedEntries, movesByes, type PlaceBox, rearrangeDraw, type Seating, seatingOf } from '@/data/placements';
+import {
+  addExtraLine,
+  drawPlaces,
+  extraBoxes,
+  heldEntries,
+  movedEntries,
+  movesByes,
+  type PlaceBox,
+  rearrangeDraw,
+  removeExtraLine,
+  type Seating,
+  seatingOf,
+} from '@/data/placements';
 import { selectDB, useStore } from '@/data/store';
 import { toast } from '@/data/toast';
 
@@ -78,6 +90,9 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
     return () => clearTimeout(t);
   }, []);
 
+  // lines added to placement round 1 (to give someone a bye), kept in the draft's seating
+  const extras = extraBoxes(ev.id, draft.seating);
+  const allBoxes = [...places.boxes, ...extras];
   const withdrawn = new Set(
     lk
       .entriesOf(ev.id)
@@ -107,7 +122,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
     .map((b) => b.title);
   const moved = movedEntries(original, draft.seating);
   const changes = moved.filter((m) => m.to || !withdrawn.has(m.entryId)).length + latePlaced.length;
-  const boxOf = (key: string) => places.boxes.find((b) => b.places.some((p) => p.key === key));
+  const boxOf = (key: string) => allBoxes.find((b) => b.places.some((p) => p.key === key));
   const where = (key: string) => {
     const b = boxOf(key);
     return b ? (b.stage ? `${b.stage} ${b.title}` : b.title) : '';
@@ -311,8 +326,9 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
   };
 
   // Later rounds preview the new seating once everyone is placed (byes carry the new players on).
+  // (not with added lines: the rebuilt round 1 has more lines than the one being edited)
   const preview = useMemo(() => {
-    if (taken.length || !changes) return lk;
+    if (taken.length || !changes || extras.length) return lk;
     const r = rearrangeDraw(selectDB(useStore.getState()), ev.id, draft.seating);
     return r.db ? makeLookup(r.db) : lk;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -321,6 +337,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
   const groupBoxes = places.boxes.filter((b) => b.kind === 'group');
   const firstLine = lk.match([...lineBox.keys()][0]);
   const startStage = firstLine ? lk.stagesOf(ev.id).find((s) => s.id === firstLine.stageId) : undefined;
+  const canAddLines = !!startStage?.placement && places.byesMovable;
 
   const rowProps = {
     lk,
@@ -367,6 +384,17 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
             Discard
           </Button>
         )}
+        {canAddLines && (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Icon name="plus" size={16} />}
+            onClick={() => setStored({ ...draft, seating: addExtraLine(ev.id, draft.seating) })}
+            title="An empty round-1 line: put a player in it and they get a bye"
+          >
+            Add a bye line
+          </Button>
+        )}
         <Button size="sm" disabled={!unsaved} icon={<Icon name="check" size={16} />} onClick={save}>
           {unsaved || !savedDraft ? 'Save changes' : 'Saved'}
         </Button>
@@ -403,6 +431,34 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
         >
           {toolbar}
         </div>
+      )}
+      {extras.length > 0 && (
+        <section aria-label="New bye lines" className="flex flex-col gap-2 rounded-xl border border-dashed border-line-strong p-3">
+          <p className="text-[13px] text-muted">
+            <span className="font-semibold text-fg">New lines in round 1.</span> Take a player out of their match and put them here to give
+            them a bye; their opponent gets a bye too unless you fill that place. Empty lines are ignored. After you publish, the placement
+            rounds are rebuilt and renumbered.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {extras.map((b) => (
+              <div key={b.id} className="flex items-center gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <EditLine box={b} {...rowProps} />
+                </div>
+                {b.places.every((p) => !draft.seating[p.key]) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Remove ${b.title}`}
+                    onClick={() => setStored({ ...draft, seating: removeExtraLine(draft.seating, b) })}
+                  >
+                    <Icon name="close" size={15} />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
       {groupBoxes.length > 0 && (
         <div className="grid min-w-0 grid-cols-1 gap-2 pb-40 sm:grid-cols-2 xl:grid-cols-3">

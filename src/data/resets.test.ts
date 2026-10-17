@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { playedCount, resetEventDraw, resetEventResults, resetMatch, resetTournamentDraws, resetTournamentResults } from '@/data/resets';
+import {
+  beforeMatchDay,
+  playedCount,
+  renumberMatches,
+  resetEventDraw,
+  resetEventResults,
+  resetMatch,
+  resetTournamentDraws,
+  resetTournamentResults,
+} from '@/data/resets';
 import { buildIowaOpen, IOWA_OPEN_ID } from '@/data/seed/iowaOpen';
 import { drawAll, simulateMatches } from '@/data/simulate';
+import { useStore } from '@/data/store';
 import type { DB } from '@/data/types';
 
 const NOW = Date.UTC(2026, 9, 17, 14, 0);
@@ -103,5 +113,58 @@ describe('saved, unpublished draw changes', () => {
     const db = played(10);
     const ev = evIds(db)[0];
     expect(resetEventResults(withDraft(db, ev), ev).drawDrafts).toHaveLength(1);
+  });
+});
+
+describe('renumbering matches from 1', () => {
+  const numbersOf = (db: DB) =>
+    db.matches
+      .filter((m) => m.number > 0)
+      .map((m) => m.number)
+      .sort((a, b) => a - b);
+
+  it('closes the gaps left by a removed draw, keeping each event in its block and its order', () => {
+    const drawn = drawAll(buildIowaOpen(NOW), IOWA_OPEN_ID, 3);
+    const first = drawn.events.find((e) => e.tournamentId === IOWA_OPEN_ID)!;
+    const gap = resetEventDraw(drawn, first.id);
+    expect(numbersOf(gap)[0]).toBeGreaterThan(1);
+    const r = renumberMatches(gap, IOWA_OPEN_ID);
+    const nums = numbersOf(r);
+    expect(nums).toEqual(nums.map((_, i) => i + 1));
+    expect(r.tournaments.find((t) => t.id === IOWA_OPEN_ID)!.nextMatchNumber).toBe(nums.length + 1);
+    // the same matches in the same order
+    const order = (db: DB) =>
+      db.matches
+        .filter((m) => m.number > 0)
+        .sort((a, b) => a.number - b.number)
+        .map((m) => m.id);
+    expect(order(r)).toEqual(order(gap));
+  });
+
+  it('happens by itself while nothing has been called or played: a redrawn event leaves no gap', () => {
+    useStore.setState(drawAll(buildIowaOpen(NOW), IOWA_OPEN_ID, 3));
+    const ev = useStore.getState().events.find((e) => e.tournamentId === IOWA_OPEN_ID)!;
+    expect(beforeMatchDay(useStore.getState(), IOWA_OPEN_ID)).toBe(true);
+    useStore.getState().resetEventDraw(ev.id);
+    const nums = numbersOf(useStore.getState());
+    expect(nums).toEqual(nums.map((_, i) => i + 1));
+  });
+
+  it('not once a match has been played: printed slips keep their numbers until you renumber', () => {
+    const db = played(5);
+    expect(beforeMatchDay(db, IOWA_OPEN_ID)).toBe(false);
+    useStore.setState(db);
+    // remove the draw with the fewest results; the other events still have played matches
+    const ev = db.events
+      .filter((e) => e.tournamentId === IOWA_OPEN_ID)
+      .sort((x, y) => playedCount(db, [x.id]) - playedCount(db, [y.id]))[0];
+    expect(beforeMatchDay(resetEventDraw(db, ev.id), IOWA_OPEN_ID)).toBe(false);
+    const before = db.matches.filter((m) => m.eventId !== ev.id && m.number > 0).map((m) => [m.id, m.number]);
+    useStore.getState().resetEventDraw(ev.id);
+    const after = useStore
+      .getState()
+      .matches.filter((m) => m.eventId !== ev.id && m.number > 0)
+      .map((m) => [m.id, m.number]);
+    expect(after).toEqual(before);
   });
 });

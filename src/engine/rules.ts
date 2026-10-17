@@ -268,10 +268,9 @@ export function isFirstMatchSlot(src: SlotSource, match: (id: ID) => MatchLink |
 /**
  * Which scoring a match uses. Events can play each player's first match shorter (e.g. one game
  * to 30) and everything after it best of 3 to 21.
- *  - Knockout / drop flight: a match uses the first-match format when either player hasn't played
- *    in the event yet, so a player with a bye still gets it in their first real match (even when
- *    their opponent has played). Players who drop to a lower flight or the plate, and the 3rd-place
- *    match, use the main rules.
+ *  - Knockout / drop flight: a match uses the first-match format only when neither player has played
+ *    in the event yet. A player coming off a bye who meets someone who has already played plays full
+ *    sets. Players who drop to a lower flight or the plate, and the 3rd-place match, use the main rules.
  *  - Round robin: every group match; the knockout after the groups uses the main rules.
  */
 export function rulesIdForMatch(
@@ -283,7 +282,7 @@ export function rulesIdForMatch(
   const fr = ev.config.firstRound;
   if (!fr || !stage) return ev.rules;
   if (ev.mode === 'round_robin') return stage.kind === 'group' ? fr : ev.rules;
-  return isFirstMatchSlot(m.srcA, match) || isFirstMatchSlot(m.srcB, match) ? fr : ev.rules;
+  return isFirstMatchSlot(m.srcA, match) && isFirstMatchSlot(m.srcB, match) ? fr : ev.rules;
 }
 
 /** Scoring used in round-robin groups (for standings). */

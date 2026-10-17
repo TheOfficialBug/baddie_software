@@ -41,6 +41,6 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     name: 'Demo Player',
     label: 'Player',
     description: 'Sees their own matches and registrations',
-    playerId: 'p-M5',
+    playerId: 'p-28',
   },
 ];

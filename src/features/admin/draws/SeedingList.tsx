@@ -151,7 +151,7 @@ export function SeedingList({
           Drag a row or use the arrows.{' '}
           {placement && (pairing ?? 'balanced') !== 'random' ? (
             <>
-              Round 1 follows this list exactly: any byes go to the top of it, then the top half of the rest plays the bottom half
+              Round 1 follows this list, A/B entries first: any byes go to the top of it, then each C/D entry plays an A/B entry
               {pairing === 'classic' ? ' (best v worst)' : ' (first of each half together)'}.
             </>
           ) : (

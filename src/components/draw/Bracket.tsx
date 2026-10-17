@@ -3,8 +3,10 @@ import { type ReactNode, useMemo } from 'react';
 import { roundName } from '@/engine/draws';
 import type { Match, Stage } from '@/engine/types';
 
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/cn';
 
+import { realClub } from '@/data/clubs';
 import type { Lookup } from '@/data/lookup';
 
 import { DrawCanvas } from '@/components/draw/DrawCanvas';
@@ -14,6 +16,7 @@ import { FlightBadge } from '@/components/tournament/Badges';
 import { Icon } from '@/components/ui/Icon';
 
 const SLOT = 68; // px per first-round match in the tree (two 28px rows + gap)
+const GAP = 20; // between round columns (gap-5)
 
 /** Matches that never get played (a bye). Not counted as matches, but still drawn so everyone starts on the left. */
 const hidden = (m: Match) => m.status === 'bye' || m.srcA.kind === 'bye' || m.srcB.kind === 'bye';
@@ -53,14 +56,48 @@ export function Bracket({
   const final = rounds[rounds.length - 1]?.[0];
   const champion =
     !stage.placement && final && (final.status === 'finished' || final.status === 'bye') && final.winner ? final[final.winner] : null;
-  const h = Math.max(1, rounds[0]?.length ?? 1) * SLOT;
-  // first-round byes are drawn ("Player vs Bye"); later rounds only hide matches that never happen
-  const isHidden = (m: Match, round: number) => (round === 0 ? false : hidden(m));
+  // first-round byes are drawn ("Player vs Bye"), except a pair of byes (a round-2 bye) outside the editor;
+  // later rounds only hide matches that never happen
+  const isHidden = (m: Match, round: number) => (round === 0 ? !editLine && m.srcA.kind === 'bye' && m.srcB.kind === 'bye' : hidden(m));
+  // Tree layout: drawn first-round matches stack with no gaps; every later match sits midway between the
+  // drawn matches its players come from (through any round they skip with a bye).
+  const layout = useMemo(() => {
+    const byId = new Map(matches.map((m) => [m.id, m]));
+    const shown = new Set(rounds.flatMap((ms, ri) => ms.filter((m) => !isHidden(m, ri)).map((m) => m.id)));
+    const origins = (m: Match): string[] =>
+      [m.srcA, m.srcB].flatMap((src) => {
+        const f = src.kind === 'winner' ? byId.get(src.matchId) : undefined;
+        return !f ? [] : shown.has(f.id) ? [f.id] : origins(f);
+      });
+    const y = new Map<string, number>();
+    const from = new Map<string, string[]>();
+    let leaves = 0;
+    for (const ms of rounds)
+      for (const m of ms) {
+        if (!shown.has(m.id)) continue;
+        const o = origins(m).filter((id) => y.has(id));
+        from.set(m.id, o);
+        y.set(m.id, o.length ? o.reduce((sum, id) => sum + y.get(id)!, 0) / o.length : (leaves++ + 0.5) * SLOT);
+      }
+    return { y, from, height: Math.max(1, leaves) * SLOT };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rounds, editLine]);
+  const h = layout.height;
   // Columns as wide as the longest name in this draw (doubles pairs too), so names show in full:
   // ~6.5px a character at 12.5px, plus the number gutter, a seed tag and up to three game scores.
   const longest = Math.max(12, ...matches.flatMap((m) => [m.a, m.b]).map((e) => (e && e !== 'BYE' ? lk.entryName(e).length : 14)));
   const levelTag = useShowLevels() ? 34 : 0; // "B/C" on organizer pages
   const colWidth = Math.min(420, Math.max(180, Math.round(longest * 6.5 + 32 + 26 + 56 + levelTag)));
+
+  // Clubs: an optional column left of round 1, one line per player (remembered on this device)
+  const [showClubs, setShowClubs] = usePersistentState<boolean>('draw.clubs', false);
+  const clubOf = (e: Match['a']) =>
+    e && e !== 'BYE' ? [...new Set(lk.playersOfEntry(e).flatMap((p) => realClub(p.club) ?? []))].join(' / ') : '';
+  const firstRound = (rounds[0] ?? []).filter((m) => layout.y.has(m.id));
+  const longestClub = Math.max(4, ...firstRound.flatMap((m) => [m.a, m.b]).map((e) => clubOf(e).length));
+  const clubWidth = showClubs ? Math.min(220, Math.max(90, Math.round(longestClub * 6 + 16))) : 0;
+  // where round columns start (after the club column)
+  const x0 = showClubs ? clubWidth + GAP : 0;
 
   return (
     <section className="min-w-0" aria-label={stage.name}>
@@ -90,12 +127,69 @@ export function Bracket({
         </div>
       )}
 
-      <DrawCanvas label={`${stage.name} bracket`} toolbar={toolbar}>
-        <div className="flex gap-5 pr-2">
+      <DrawCanvas
+        label={`${stage.name} bracket`}
+        toolbar={toolbar}
+        controls={
+          <button
+            type="button"
+            aria-pressed={showClubs}
+            onClick={() => setShowClubs(!showClubs)}
+            title={showClubs ? 'Hide clubs' : "Show each player's club"}
+            className={cn(
+              'min-h-8 rounded-full px-2.5 text-[12px] font-semibold touch:min-h-10',
+              showClubs ? 'bg-fg text-bg' : 'text-muted hover:bg-sunken hover:text-fg',
+            )}
+          >
+            Clubs
+          </button>
+        }
+      >
+        <div className="relative flex gap-5 pr-2">
+          {/* connectors: from each match to the next match its winner plays, an elbow in the gap before it */}
+          <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={h} aria-hidden>
+            {rounds.flatMap((ms, ri) =>
+              ms.flatMap((m) =>
+                (layout.from.get(m.id) ?? []).map((o) => {
+                  const src = matches.find((x) => x.id === o)!;
+                  const x1 = x0 + (src.round - 1) * (colWidth + GAP) + colWidth;
+                  const x2 = x0 + ri * (colWidth + GAP);
+                  const xm = x2 - GAP / 2;
+                  return (
+                    <path
+                      key={`${o}>${m.id}`}
+                      d={`M${x1} ${layout.y.get(o)} H${xm} V${layout.y.get(m.id)} H${x2}`}
+                      className="fill-none stroke-line-strong"
+                      strokeWidth={1}
+                    />
+                  );
+                }),
+              ),
+            )}
+          </svg>
+          {showClubs && (
+            <div className="flex shrink-0 flex-col" style={{ width: clubWidth }} aria-label="Clubs">
+              <div className="sticky top-0 z-[1] -mt-10 mb-2 flex h-8 items-center justify-end rounded-md bg-surface/95 px-1 backdrop-blur">
+                <span className="eyebrow text-muted">Club</span>
+              </div>
+              <div className="relative" style={{ height: h }}>
+                {firstRound.map((m) => (
+                  <div
+                    key={m.id}
+                    className="absolute inset-x-0 flex flex-col justify-center text-right text-[11.5px] text-muted"
+                    style={{ top: layout.y.get(m.id)! - SLOT / 2, height: SLOT }}
+                  >
+                    {(['a', 'b'] as const).map((side) => (
+                      <span key={side} className="truncate leading-7" title={clubOf(m[side])}>
+                        {clubOf(m[side]) || '\u00a0'}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {rounds.map((ms, ri) => {
-            const pairs: Match[][] = [];
-            for (let i = 0; i < ms.length; i += 2) pairs.push(ms.slice(i, i + 2));
-            const last = ri === rounds.length - 1;
             const done = ms.filter((m) => m.status === 'finished').length;
             const real = ms.filter((m) => !hidden(m)).length;
             return (
@@ -106,34 +200,13 @@ export function Bracket({
                     {done}/{real}
                   </span>
                 </div>
-                <div className="flex flex-col" style={{ height: h }}>
-                  {pairs.map((pair, pi) => {
-                    const [top, bottom] = pair.map((m) => !isHidden(m, ri));
-                    // vertical joiner between the pair's two stubs (only from matches that are drawn)
-                    const bar =
-                      pair.length === 2 && (top || bottom)
-                        ? top && bottom
-                          ? 'top-1/4 bottom-1/4'
-                          : top
-                            ? 'top-1/4 bottom-1/2'
-                            : 'top-1/2 bottom-1/4'
-                        : null;
+                <div className="relative" style={{ height: h }}>
+                  {ms.map((m) => {
+                    const y = layout.y.get(m.id);
+                    if (y === undefined) return null;
                     return (
-                      <div key={pi} className="relative flex flex-1 flex-col">
-                        {pair.map((m) => (
-                          <div key={m.id} className="relative flex flex-1 items-center py-1">
-                            {isHidden(m, ri) ? null : (
-                              <>
-                                {ri > 0 && <span className="absolute -left-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
-                                {!last && <span className="absolute -right-3.5 top-1/2 h-px w-3.5 bg-line-strong" />}
-                                {editLine && ri === 0 ? editLine(m) : <BracketMatch lk={lk} m={m} highlight={highlight} onOpen={onOpen} />}
-                              </>
-                            )}
-                          </div>
-                        ))}
-                        {!last && bar && <span className={cn('absolute -right-3.5 w-px bg-line-strong', bar)} />}
-                        {/* a round-1 pair of byes still feeds the next round */}
-                        {!last && ri === 0 && !top && !bottom && <span className="absolute -right-3.5 top-1/2 h-px w-3.5 bg-line" />}
+                      <div key={m.id} className="absolute inset-x-0 flex items-center py-1" style={{ top: y - SLOT / 2, height: SLOT }}>
+                        {editLine && ri === 0 ? editLine(m) : <BracketMatch lk={lk} m={m} highlight={highlight} onOpen={onOpen} />}
                       </div>
                     );
                   })}
@@ -141,13 +214,16 @@ export function Bracket({
               </div>
             );
           })}
-          {champion && champion !== 'BYE' && (
+          {champion && champion !== 'BYE' && final && (
             <div className="flex w-[170px] shrink-0 flex-col">
               <div className="sticky top-0 z-[1] -mt-10 mb-2 flex h-8 items-center px-1">
                 <span className="eyebrow text-fg">Winner</span>
               </div>
-              <div className="flex items-center" style={{ height: h }}>
-                <div className="flex w-full items-center gap-2 rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-semibold text-primary-fg">
+              <div className="relative" style={{ height: h }}>
+                <div
+                  className="absolute inset-x-0 flex items-center gap-2 rounded-md bg-primary px-2.5 py-1.5 text-[13px] font-semibold text-primary-fg"
+                  style={{ top: (layout.y.get(final.id) ?? h / 2) - 16 }}
+                >
                   <Icon name="trophy" size={15} />
                   <span className="truncate">{lk.entryName(champion)}</span>
                 </div>
