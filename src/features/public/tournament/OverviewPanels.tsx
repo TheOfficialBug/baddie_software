@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { fmtDate, money } from '@/lib/format';
 
 import { champions } from '@/data/queries';
+import { registrationOpen } from '@/data/registration';
 
 import { useAccess } from '@/auth/useAccess';
 
@@ -123,7 +124,7 @@ export function RegistrationOverview() {
       <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
         <div className="panel flex flex-col gap-3 p-4 sm:p-5">
           <span className="eyebrow">Registration</span>
-          {t.status === 'closed' ? (
+          {!registrationOpen(t) ? (
             <>
               <div className="font-display text-[24px] font-extrabold leading-tight">Closed</div>
               <p className="text-[14px] text-muted">

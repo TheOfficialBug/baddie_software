@@ -124,6 +124,7 @@ export function AdminShell() {
             { to: `/admin/t/${t.id}/scores`, label: 'All results', icon: 'whistle' },
             { to: `/admin/t/${t.id}/slips`, label: 'Score slips', icon: 'print' },
             { to: `/admin/t/${t.id}/settings`, label: 'Settings', icon: 'settings', cap: 'manage_settings' },
+            { to: '/admin/team', label: 'Team', icon: 'users' },
             ...(demo
               ? [{ to: `/admin/t/${t.id}/simulate`, label: 'Simulator', icon: 'sparkles' as const, cap: 'manage_settings' as const }]
               : []),

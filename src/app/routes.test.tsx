@@ -142,6 +142,13 @@ describe('access', () => {
     }
   });
 
+  it('owners invite collaborators from the Team page', async () => {
+    await authActions.signIn(OWNER, DEMO_PASSWORD);
+    await renderAt('/admin/team');
+    expect(await screen.findByRole('heading', { name: 'Team', level: 1 })).toBeInTheDocument();
+    expect(screen.getByLabelText('Invite by email')).toBeInTheDocument();
+  });
+
   it('signed-in people skip the sign-in page', async () => {
     await authActions.signIn(PLAYER, DEMO_PASSWORD);
     const { router } = await renderAt('/login?next=%2Faccount');

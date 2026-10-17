@@ -8,6 +8,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { fmtDate, fmtDateRange } from '@/lib/format';
 
 import { type Lookup, useLookup } from '@/data/lookup';
+import { registrationOpen } from '@/data/registration';
 
 import { EventChip, LiveDot, Pill } from '@/components/tournament/Badges';
 import { ButtonLink } from '@/components/ui/Button';
@@ -26,7 +27,7 @@ export function Home() {
   const open = lk.tournaments.filter((t) => (t.status === 'registration' || t.status === 'closed') && match(t));
   const done = lk.tournaments.filter((t) => t.status === 'completed' && match(t));
   const firstLive = lk.tournaments.find((t) => t.status === 'live');
-  const firstOpen = lk.tournaments.find((t) => t.status === 'registration');
+  const firstOpen = lk.tournaments.find((t) => registrationOpen(t));
 
   const paths: { icon: IconName; title: string; body: string; to: string; cta: string }[] = [
     {
@@ -41,7 +42,7 @@ export function Home() {
       title: 'Register to play',
       body: 'Pick your events, add a doubles partner and pay in one go.',
       to: firstOpen ? `/t/${firstOpen.slug}/register` : '/',
-      cta: 'Find an event',
+      cta: firstOpen ? 'Find an event' : 'Registration is closed',
     },
     {
       icon: 'whistle',
@@ -220,7 +221,7 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
         >
           {t.status === 'live' ? 'Watch live' : t.status === 'registration' ? 'See events' : 'See results'}
         </ButtonLink>
-        {t.status === 'registration' && (
+        {registrationOpen(t) && (
           <ButtonLink to={`/t/${t.slug}/register`} variant="primary" size="sm">
             Register
           </ButtonLink>

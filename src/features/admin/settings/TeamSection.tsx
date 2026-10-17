@@ -1,9 +1,11 @@
 import { type FormEvent, useState } from 'react';
 
+import { env } from '@/config/env';
 import type { ID } from '@/engine/types';
 
 import { fmtAgo } from '@/lib/format';
 
+import { remoteTeam } from '@/data/remote';
 import { useStore } from '@/data/store';
 import { toast } from '@/data/toast';
 import type { Role } from '@/data/types';
@@ -30,7 +32,27 @@ export function TeamSection({ orgId }: { orgId: ID }) {
   const allInvites = useStore((s) => s.orgInvites);
   const members = allMembers.filter((m) => m.orgId === orgId);
   const invites = allInvites.filter((i) => i.orgId === orgId);
-  const { inviteMember, cancelInvite, setMemberRole, removeMember } = useStore.getState();
+  // checked and shown at once; with Supabase the database then makes the change (and has the final say)
+  const store = useStore.getState();
+  const inviteMember = (o: ID, e: string, r: Role) => {
+    const err = store.inviteMember(o, e, r);
+    if (!err && env.supabase) void remoteTeam.invite(o, e, r);
+    return err;
+  };
+  const cancelInvite = (id: ID) => {
+    store.cancelInvite(id);
+    if (env.supabase) void remoteTeam.cancelInvite(id);
+  };
+  const setMemberRole = (o: ID, u: ID, r: Role) => {
+    const err = store.setMemberRole(o, u, r);
+    if (!err && env.supabase) void remoteTeam.setRole(o, u, r);
+    return err;
+  };
+  const removeMember = (o: ID, u: ID) => {
+    const err = store.removeMember(o, u);
+    if (!err && env.supabase) void remoteTeam.remove(o, u);
+    return err;
+  };
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('scorer');

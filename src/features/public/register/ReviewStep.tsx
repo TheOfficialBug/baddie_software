@@ -1,3 +1,4 @@
+import { env } from '@/config/env';
 import type { TEvent, Tournament } from '@/engine/types';
 
 import { fmtDate, money } from '@/lib/format';
@@ -98,7 +99,9 @@ export function ReviewStep({ t, me, chosen, picked, total, onEditStep }: Props) 
             <Icon name="card" size={20} /> Payment
           </div>
           <p className="text-[14px] text-muted">
-            In the live app, a secure card checkout opens when you tap Pay. This demo doesn't take real payments.
+            {env.supabase
+              ? 'Entry fees are paid to the organizer, not online. Your entry is confirmed once the organizer accepts it.'
+              : "In the live app, a secure card checkout opens when you tap Pay. This demo doesn't take real payments."}
           </p>
           <p className="text-[13px] text-faint">
             Refunds are available until registration closes on {fmtDate(t.regCloses ?? t.startDate)}.

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useMatch } from 'react-router';
 
 import { APP_NAME } from '@/config/app';
+import { env } from '@/config/env';
 
 import { cn } from '@/lib/cn';
 
@@ -117,6 +118,7 @@ export function BottomBar({ items }: { items: { to: string; label: string; icon:
 export function Footer() {
   const reset = useStore((s) => s.resetDemo);
   const [confirm, setConfirm] = useState(false);
+  if (env.supabase) return null;
   return (
     <footer className="no-print hidden border-t border-line md:block">
       <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-4 gap-y-2 px-6 py-5 text-[13px] text-muted">

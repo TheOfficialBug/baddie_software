@@ -1,3 +1,5 @@
+import { env } from '@/config/env';
+
 import { money } from '@/lib/format';
 
 import { Button } from '@/components/ui/Button';
@@ -13,10 +15,12 @@ type Props = {
   onBack: () => void;
   onNext: () => void;
   onPay: () => void;
+  /** The entry is being sent. */
+  busy?: boolean;
 };
 
 /** Running total plus Back/Continue/Pay controls: fixed to the bottom on phones, inline from tablets up. */
-export function WizardActionBar({ step, last, count, total, onCancel, onBack, onNext, onPay }: Props) {
+export function WizardActionBar({ step, last, count, total, onCancel, onBack, onNext, onPay, busy }: Props) {
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur md:static md:z-auto md:mt-8 md:border-0 md:bg-transparent md:backdrop-blur-none"
@@ -43,8 +47,17 @@ export function WizardActionBar({ step, last, count, total, onCancel, onBack, on
             Continue
           </Button>
         ) : (
-          <Button variant="primary" onClick={onPay} icon={<Icon name="card" size={18} />}>
-            Pay <span className="num">{money(total)}</span>
+          <Button variant="primary" onClick={onPay} disabled={busy} icon={<Icon name={env.supabase ? 'check' : 'card'} size={18} />}>
+            {/* the live site takes fees at the venue: no card checkout */}
+            {busy ? (
+              'Sending…'
+            ) : env.supabase ? (
+              'Submit entry'
+            ) : (
+              <>
+                Pay <span className="num">{money(total)}</span>
+              </>
+            )}
           </Button>
         )}
       </div>

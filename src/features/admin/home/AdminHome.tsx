@@ -7,7 +7,7 @@ import { useLookup } from '@/data/lookup';
 import { orgsWhere } from '@/auth/permissions';
 import { useAccess } from '@/auth/useAccess';
 
-import { Button } from '@/components/ui/Button';
+import { Button, ButtonLink } from '@/components/ui/Button';
 import { Empty } from '@/components/ui/Empty';
 import { Icon } from '@/components/ui/Icon';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -57,11 +57,16 @@ export function AdminHome() {
         title="Your tournaments"
         description="Set up events, confirm entries, make the draws and run match day, all from here."
         actions={
-          createIn.length > 0 && (
-            <Button variant="primary" icon={<Icon name="add" size={18} />} onClick={() => setCreating(true)}>
-              New tournament
-            </Button>
-          )
+          <>
+            <ButtonLink to="/admin/team" icon={<Icon name="users" size={18} />}>
+              Team
+            </ButtonLink>
+            {createIn.length > 0 && (
+              <Button variant="primary" icon={<Icon name="add" size={18} />} onClick={() => setCreating(true)}>
+                New tournament
+              </Button>
+            )}
+          </>
         }
       />
 

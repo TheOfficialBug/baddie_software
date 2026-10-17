@@ -39,9 +39,15 @@ Most of the 1,800+ tests live here. Randomness always comes from a seeded RNG (`
 - `queries.ts`: derived views shared by several screens (call queue, players of a tournament, champions).
 - `toast.ts`: transient notifications; call `toast('Saved')` from anywhere.
 
-**Moving to Supabase** (next step) replaces persistence, not the shape of the app: the store keeps the same
-actions, but they call the RPCs in `supabase/migrations` (`call_match`, `record_result`) and realtime subscriptions
-update the snapshot. Screens keep reading through `useLookup()` and `useStore` selectors.
+- `remote.ts` (Supabase only): live data. Each record of the snapshot is a JSON row in `app_entities`
+  (`supabase/migrations/20261017120000_app_entities.sql`). On start and on sign-in/out it loads what the account may
+  see; after every store change it diffs the snapshot and writes the changed records (staff directly, players through
+  the `app_submit` RPC); Realtime pushes other devices' changes in, with a catch-up query by `version` after a
+  dropped connection. Screens are unchanged: they still read through `useLookup()` and `useStore` selectors.
+  Without Supabase settings the store keeps its data in `localStorage` (demo mode) and `sync.ts` mirrors other tabs.
+
+The normalized tables from the first migration (with `call_match` / `record_result`) remain the long-term target;
+today they back accounts, organizations and invites only. See [LAUNCH.md](LAUNCH.md) for the current scope.
 
 ### auth/ — accounts and permissions
 

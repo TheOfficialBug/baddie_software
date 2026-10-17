@@ -4,8 +4,11 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router/dom';
 
+import { env } from '@/config/env';
+
 import { initMonitoring } from '@/lib/monitoring';
 
+import { startRemoteSync } from '@/data/remote';
 import { startCrossTabSync } from '@/data/sync';
 
 import { initAuth } from '@/auth/authStore';
@@ -15,8 +18,9 @@ import { createAppRouter } from '@/app/router';
 initMonitoring();
 // restore the session (or demo account) while the first page loads
 void initAuth();
-// other open tabs see the desk's changes immediately
-startCrossTabSync();
+// live data from Supabase on every device; in demo mode, other open tabs see the desk's changes immediately
+if (env.supabase) startRemoteSync();
+else startCrossTabSync();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element in index.html');

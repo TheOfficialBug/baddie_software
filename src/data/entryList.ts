@@ -27,6 +27,8 @@ export interface ListPlayer {
   gender: Gender;
   club: string;
   birthYear?: number;
+  /** Contact email: links the player's account to this record when they sign in with it. */
+  email?: string;
   singlesLevel?: SkillLevel;
   doublesLevel?: SkillLevel;
   lines: ListLine[];
@@ -218,6 +220,7 @@ export function parseEntryList(rows: string[][], knownEvents: string[] = []): En
     dob: col('dob', 'date of birth', 'birth year', 'year of birth'),
     gender: col('gender', 'sex'),
     club: col('club'),
+    email: col('email', 'e-mail', 'email address'),
     level1: col('level1', 'level 1', 'singles level'),
     level2: col('level2', 'level 2', 'doubles level'),
     events: col('events'),
@@ -266,6 +269,7 @@ export function parseEntryList(rows: string[][], knownEvents: string[] = []): En
       gender,
       club: NO_CLUB.has(club.toLowerCase()) ? 'No club' : club,
       birthYear: birthYearOf(cell(r, c.dob)),
+      email: emailOf(cell(r, c.email)),
       singlesLevel: level(cell(r, c.level1)),
       doublesLevel: level(cell(r, c.level2)),
       lines,
@@ -273,6 +277,11 @@ export function parseEntryList(rows: string[][], knownEvents: string[] = []): En
   });
   return { players, skipped };
 }
+
+const emailOf = (s: string) => {
+  const e = s.trim().toLowerCase();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) ? e : undefined;
+};
 
 // ---------- planning an import ----------
 
@@ -312,10 +321,17 @@ export function planImport(db: DB, tournamentId: ID, list: EntryList): ImportPla
     };
   if (!list.players.length) return { ...plan, blocked: 'No players found in this file.' };
 
-  // players: reuse a record with the same name and gender (e.g. from an earlier import)
+  // players: reuse a record with the same email, else the same name and gender (e.g. from an earlier import,
+  // or a player who signed up and registered online)
   const t = db.tournaments.find((x) => x.id === tournamentId);
   const defaultBirthYear = Number((t?.startDate ?? new Date().toISOString()).slice(0, 4)) - 25;
   const byName = new Map(db.players.map((p) => [`${norm(p.name)}|${p.gender}`, p]));
+  const byEmail = new Map(db.players.filter((p) => p.email).map((p) => [p.email!.trim().toLowerCase(), p]));
+  for (const lp of list.players) {
+    const known = lp.email ? byEmail.get(lp.email) : undefined;
+    const key = `${norm(lp.name)}|${lp.gender}`;
+    if (known && known.gender === lp.gender && !byName.has(key)) byName.set(key, known);
+  }
   const seen = new Map<string, number>();
   plan.players = list.players.map((lp) => {
     const key = `${norm(lp.name)}|${lp.gender}`;
@@ -335,12 +351,20 @@ export function planImport(db: DB, tournamentId: ID, list: EntryList): ImportPla
         club: lp.club,
         birthYear: lp.birthYear ?? defaultBirthYear,
         level: lvl ?? 'C',
+        ...(lp.email ? { email: lp.email } : {}),
       };
       byName.set(key, p);
       return p;
     }
-    const next = { ...old, club: lp.club, level: lvl ?? old.level, birthYear: lp.birthYear ?? old.birthYear };
-    if (next.club !== old.club || next.level !== old.level || next.birthYear !== old.birthYear) plan.updatedPlayers++;
+    const next = {
+      ...old,
+      club: lp.club,
+      level: lvl ?? old.level,
+      birthYear: lp.birthYear ?? old.birthYear,
+      ...(lp.email && !old.email ? { email: lp.email } : {}),
+    };
+    if (next.club !== old.club || next.level !== old.level || next.birthYear !== old.birthYear || next.email !== old.email)
+      plan.updatedPlayers++;
     byName.set(key, next);
     return next;
   });

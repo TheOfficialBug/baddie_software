@@ -24,3 +24,6 @@ supabase/.temp
 .DS_Store
 Thumbs.db
 *.log
+
+.vercel
+.claude/settings.local.json

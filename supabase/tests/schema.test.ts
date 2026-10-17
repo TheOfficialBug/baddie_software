@@ -703,7 +703,7 @@ describe('accounts', () => {
   });
 
   it('only owners invite staff; the invite turns into a membership once the email is verified', async () => {
-    const org = (await one<{ id: string }>(`select id from organizations limit 1`)).id;
+    const org = (await one<{ id: string }>(`select id from organizations where slug <> 'smashboard' order by created_at limit 1`)).id;
     await rejects(
       () =>
         as('scorer', () =>

@@ -135,7 +135,7 @@ describe('supabase accounts', () => {
     const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
     const c = {
       auth,
-      rpc: vi.fn().mockImplementation((fn: string) => Promise.resolve({ data: fn === 'claim_my_player' ? 'p1' : 1, error: null })),
+      rpc: vi.fn().mockImplementation((fn: string) => Promise.resolve({ data: fn === 'app_claim_player' ? 'p1' : 1, error: null })),
       from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq }), update }),
     };
     return c;

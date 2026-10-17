@@ -126,7 +126,7 @@ export function createSupabaseBackend(client: SupabaseClient, googleEnabled: boo
     async loadAccess(user): Promise<Access> {
       // Pending staff invites for this (verified) email become memberships; the player record is linked.
       await client.rpc('accept_my_invites');
-      const claimed = await client.rpc('claim_my_player');
+      const claimed = await client.rpc('app_claim_player');
       const rows = check(await client.from('organization_members').select('organization_id, role').eq('user_id', user.id));
       return {
         memberships: ((rows.data ?? []) as { organization_id: string; role: Access['memberships'][number]['role'] }[]).map((r) => ({

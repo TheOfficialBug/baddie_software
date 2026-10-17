@@ -6,6 +6,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { fmtDate, fmtDateRange } from '@/lib/format';
 
 import { useLookup } from '@/data/lookup';
+import { registrationOpen } from '@/data/registration';
 
 import { HelpButton } from '@/components/help/Help';
 import { NotFound } from '@/components/NotFound';
@@ -68,7 +69,7 @@ export function TournamentLayout() {
               <NoticeBell tone="hero" tournamentId={t.id} />
               <ThemeSwitchButton tone="hero" />
               <AccountMenu tone="hero" />
-              {t.status === 'registration' && (
+              {registrationOpen(t) && (
                 <ButtonLink to={`${base}/register`} variant="primary" className="ml-1 hidden sm:inline-flex">
                   Register
                 </ButtonLink>
@@ -89,7 +90,7 @@ export function TournamentLayout() {
                     <LiveDot /> Live now · {onCourt} {onCourt === 1 ? 'court' : 'courts'}
                   </Pill>
                 )}
-                {t.status === 'registration' && (
+                {registrationOpen(t) && (
                   <Pill tone="lime">Registration open until {fmtDate(t.regCloses ?? t.startDate, { month: 'short', day: 'numeric' })}</Pill>
                 )}
                 {t.status === 'closed' && <Pill tone="hero">Registration closed · draws coming soon</Pill>}
@@ -105,7 +106,7 @@ export function TournamentLayout() {
             </div>
             <PlayerSearch lk={lk} t={t} className="w-full sm:w-[320px]" />
           </div>
-          {t.status === 'registration' && (
+          {registrationOpen(t) && (
             <ButtonLink to={`${base}/register`} variant="primary" size="lg" className="sm:hidden">
               Register for this tournament
             </ButtonLink>

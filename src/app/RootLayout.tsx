@@ -1,7 +1,13 @@
+import type { ReactNode } from 'react';
 import { Outlet, ScrollRestoration, useNavigation } from 'react-router';
+
+import { env } from '@/config/env';
 
 import { cn } from '@/lib/cn';
 
+import { reload, useRemote } from '@/data/remote';
+
+import { Button } from '@/components/ui/Button';
 import { PageLoading } from '@/components/ui/PageLoading';
 import { Toaster } from '@/components/ui/Toaster';
 
@@ -19,12 +25,29 @@ function NavigationProgress() {
   );
 }
 
+/** With Supabase: wait for the first load of the live data (pages would otherwise say "not found"). */
+function LiveData({ children }: { children: ReactNode }) {
+  const status = useRemote((s) => s.status);
+  const error = useRemote((s) => s.error);
+  if (!env.supabase || status === 'ready') return <>{children}</>;
+  if (status === 'error')
+    return (
+      <div role="alert" className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-[15px] text-muted">{error}</p>
+        <Button onClick={() => void reload()}>Try again</Button>
+      </div>
+    );
+  return <PageLoading />;
+}
+
 /** Wraps every route: toasts, scroll restoration and the loading bar. */
 export function RootLayout() {
   return (
     <>
       <NavigationProgress />
-      <Outlet />
+      <LiveData>
+        <Outlet />
+      </LiveData>
       <Toaster />
       <ScrollRestoration />
     </>

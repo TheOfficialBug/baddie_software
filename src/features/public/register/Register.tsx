@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
+import { env } from '@/config/env';
+
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { fmtDate, fmtDateRange } from '@/lib/format';
 
 import { isDoubles } from '@/data/eligibility';
 import { useLookup } from '@/data/lookup';
+import { registrationOpen } from '@/data/registration';
+import { saved } from '@/data/remote';
 import { useStore } from '@/data/store';
 
 import { useAccess } from '@/auth/useAccess';
@@ -60,6 +64,7 @@ export function Register() {
   }));
   const [picked, setPicked, clearPicked] = usePersistentState<Picks>(draftKey('picks'), {});
   const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
   const { ask, dialog } = useConfirm();
   const [touched, setTouched] = useState(false);
 
@@ -69,7 +74,7 @@ export function Register() {
   const meErrors = registrantErrors(me);
 
   if (!t) return <NotFound what="tournament" />;
-  if (t.status !== 'registration') return <RegistrationClosed t={t} />;
+  if (!registrationOpen(t)) return <RegistrationClosed t={t} />;
   if (done)
     return <RegistrationDone t={t} me={me} partnersNamed={chosen.some((e) => isDoubles(e.kind) && picked[e.id].partnerMode === 'named')} />;
 
@@ -97,7 +102,8 @@ export function Register() {
     goTo(step + 1);
   };
 
-  const pay = () => {
+  const pay = async () => {
+    if (sending) return;
     const picks = chosen.map((ev) => toRegistrationPick(ev, picked[ev.id]));
     const singles = chosen.find((e) => !isDoubles(e.kind));
     const general = picked[(singles ?? chosen[0]).id].myLevel!;
@@ -107,6 +113,13 @@ export function Register() {
       ? (updatePlayer(linked.id, details), linked.id)
       : addPlayer({ ...details, email: me.email.trim(), userId: user?.id });
     register(t.id, pid, picks, total);
+    if (env.supabase) {
+      // wait for the server to accept the entry; if it refuses, a toast says why and the form stays
+      setSending(true);
+      const ok = await saved();
+      setSending(false);
+      if (!ok) return;
+    }
     clearStep();
     clearPicked();
     clearMe();
@@ -182,7 +195,8 @@ export function Register() {
         onCancel={() => nav(`/t/${t.slug}`)}
         onBack={() => goTo(step - 1)}
         onNext={next}
-        onPay={pay}
+        onPay={() => void pay()}
+        busy={sending}
       />
     </div>
   );

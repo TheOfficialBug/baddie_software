@@ -81,6 +81,7 @@ export const routes: RouteObject[] = [
             lazy: () => import('@/features/admin/AdminShell').then((m) => ({ Component: m.AdminShell })),
             children: [
               { index: true, lazy: () => import('@/features/admin/home/AdminHome').then((m) => ({ Component: m.AdminHome })) },
+              { path: 'team', lazy: () => import('@/features/admin/team/TeamPage').then((m) => ({ Component: m.TeamPage })) },
               {
                 path: 't/:tid',
                 ...needs('run_match_day'),

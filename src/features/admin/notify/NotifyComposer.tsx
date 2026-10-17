@@ -1,3 +1,4 @@
+import { env } from '@/config/env';
 import type { ID, TEvent } from '@/engine/types';
 
 import { cn } from '@/lib/cn';
@@ -124,7 +125,9 @@ export function NotifyComposer(p: ComposerProps) {
           })}
         </div>
         <p className="text-[12.5px] text-muted">
-          Text and email are simulated in this prototype; in-app notifications show up in each player's bell.
+          {env.supabase
+            ? "Messages show up in each player's bell in the app. Text and email aren't connected yet."
+            : "Text and email are simulated in this prototype; in-app notifications show up in each player's bell."}
         </p>
       </div>
 

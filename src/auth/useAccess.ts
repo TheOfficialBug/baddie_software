@@ -39,7 +39,8 @@ export function useAccess(): AccessInfo {
             playerId: players.find((p) => p.userId === user.id)?.id ?? null,
           }
         : user
-          ? loaded
+          ? // a player record made after sign-in (first registration) counts straight away
+            { ...loaded, playerId: loaded.playerId ?? players.find((p) => p.userId === user.id)?.id ?? null }
           : { memberships: [], playerId: null };
     return {
       ...access,

@@ -16,28 +16,25 @@ import { Field, Input } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
 import { Stepper } from '@/components/ui/Stepper';
 
-const TEMPLATES: Record<string, { label: string; events: { kind: EventKind; name?: string; mode: TEvent['mode']; maxAge?: number }[] }> = {
-  open: {
-    label: 'Open: MS, WS, MD, WD, XD',
-    events: [
-      { kind: 'MS', mode: 'drop_flight' },
-      { kind: 'WS', mode: 'round_robin' },
-      { kind: 'MD', mode: 'knockout' },
-      { kind: 'WD', mode: 'round_robin' },
-      { kind: 'XD', mode: 'drop_flight' },
-    ],
-  },
-  juniors: {
-    label: 'Juniors: U15 and U17 singles',
-    events: [
-      { kind: 'MS', name: "Boys' Singles U15", mode: 'round_robin', maxAge: 15 },
-      { kind: 'WS', name: "Girls' Singles U15", mode: 'round_robin', maxAge: 15 },
-      { kind: 'MS', name: "Boys' Singles U17", mode: 'knockout', maxAge: 17 },
-      { kind: 'WS', name: "Girls' Singles U17", mode: 'knockout', maxAge: 17 },
-    ],
-  },
-  empty: { label: 'Start empty', events: [] },
-};
+/** Draw format each standard event starts with (changed per event before drawing). */
+const STANDARD: { kind: EventKind; mode: TEvent['mode'] }[] = [
+  { kind: 'MS', mode: 'drop_flight' },
+  { kind: 'WS', mode: 'round_robin' },
+  { kind: 'MD', mode: 'knockout' },
+  { kind: 'WD', mode: 'round_robin' },
+  { kind: 'XD', mode: 'drop_flight' },
+];
+
+interface EventChoice {
+  key: string;
+  kind: EventKind;
+  name: string;
+  mode: TEvent['mode'];
+  on: boolean;
+  custom?: boolean;
+}
+
+const KINDS = Object.keys(KIND_LABEL) as EventKind[];
 
 /** `orgId`: the organization that will run the tournament (its staff get access). */
 export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; orgId: string; onClose: () => void }) {
@@ -45,21 +42,33 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
   const nav = useNavigate();
   const start0 = addDaysISO(todayISO(), 30);
   const [f, setF] = useState({
-    name: 'Harvest Doubles 2026',
-    venue: 'Riverside Sports Center',
-    city: 'Ames, IA',
+    name: '',
+    venue: '',
+    city: '',
     start: start0,
     end: start0,
     courts: 6,
-    template: 'open',
     firstRound: 'ONE_30' as RulesId | 'same',
     rules: 'BWF_3x21' as RulesId,
   });
+  const [events, setEvents] = useState<EventChoice[]>(() =>
+    STANDARD.map((e) => ({ key: e.kind, kind: e.kind, name: KIND_LABEL[e.kind], mode: e.mode, on: true })),
+  );
+  const [custom, setCustom] = useState<{ name: string; kind: EventKind }>({ name: '', kind: 'MS' });
+  const addCustom = () => {
+    const name = custom.name.trim();
+    if (!name) return;
+    setEvents([...events, { key: `custom-${Date.now()}`, kind: custom.kind, name, mode: 'round_robin', on: true, custom: true }]);
+    setCustom({ ...custom, name: '' });
+  };
   const rules: RulesId = f.rules;
   const firstRound = f.firstRound === 'same' ? undefined : f.firstRound;
   const err = !f.name.trim() ? 'Give the tournament a name.' : f.end < f.start ? 'The end date is before the start date.' : null;
+  // problems show once the organizer tries to create, not while the form is still empty
+  const [tried, setTried] = useState(false);
 
   const submit = () => {
+    setTried(true);
     if (err) return;
     const slug =
       f.name
@@ -73,8 +82,8 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
         slug,
         organizationId: orgId,
         name: f.name.trim(),
-        venue: f.venue,
-        city: f.city,
+        venue: f.venue.trim(),
+        city: f.city.trim(),
         startDate: f.start,
         endDate: f.end,
         status: 'registration',
@@ -84,17 +93,18 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
         restMinutes: 20,
         courts: Array.from({ length: f.courts }, (_, i) => ({ id: `c${i + 1}-${slug}`, name: `Court ${i + 1}` })),
       },
-      TEMPLATES[f.template].events.map((e) => ({
-        kind: e.kind,
-        name: e.name ?? KIND_LABEL[e.kind],
-        maxAge: e.maxAge,
-        fee: e.kind.endsWith('S') ? 30 : 25,
-        cap: 32,
-        rules,
-        mode: e.mode,
-        config: { groupSize: 4, advance: 2, variant: 'PLACEMENT', thirdPlace: false, plate: false, seeds: 0, firstRound },
-        drawState: 'none',
-      })),
+      events
+        .filter((e) => e.on)
+        .map((e) => ({
+          kind: e.kind,
+          name: e.name,
+          fee: e.kind.endsWith('S') ? 30 : 25,
+          cap: 32,
+          rules,
+          mode: e.mode,
+          config: { groupSize: 4, advance: 2, variant: 'PLACEMENT', thirdPlace: false, plate: false, seeds: 0, firstRound },
+          drawState: 'none',
+        })),
     );
     toast(`${f.name} created. Registration is open.`);
     onClose();
@@ -112,7 +122,7 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={submit} disabled={!!err}>
+          <Button variant="primary" onClick={submit} disabled={tried && !!err}>
             Create tournament
           </Button>
         </>
@@ -125,11 +135,24 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
           submit();
         }}
       >
-        <Field label="Name" className="sm:col-span-2" error={err ?? undefined}>
-          {(id) => <Input id={id} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />}
+        <Field label="Name" className="sm:col-span-2" error={(tried && err) || undefined}>
+          {(id) => (
+            <Input id={id} value={f.name} placeholder="e.g. Harvest Doubles 2026" onChange={(e) => setF({ ...f, name: e.target.value })} />
+          )}
         </Field>
-        <Field label="Venue">{(id) => <Input id={id} value={f.venue} onChange={(e) => setF({ ...f, venue: e.target.value })} />}</Field>
-        <Field label="City">{(id) => <Input id={id} value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} />}</Field>
+        <Field label="Venue">
+          {(id) => (
+            <Input
+              id={id}
+              value={f.venue}
+              placeholder="e.g. Riverside Sports Center"
+              onChange={(e) => setF({ ...f, venue: e.target.value })}
+            />
+          )}
+        </Field>
+        <Field label="City">
+          {(id) => <Input id={id} value={f.city} placeholder="e.g. Ames, IA" onChange={(e) => setF({ ...f, city: e.target.value })} />}
+        </Field>
         <Field label="First day">
           {(id) => (
             <Input
@@ -156,17 +179,58 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
             />
           )}
         </Field>
-        <Field label="Events" hint="A starting set. Add or remove events later.">
-          {(id) => (
-            <Select id={id} value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>
-              {Object.entries(TEMPLATES).map(([k, v]) => (
+        <fieldset className="flex flex-col gap-2 sm:col-span-2">
+          <legend className="mb-1.5 text-[14px] font-semibold">Events</legend>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {events.map((e) => (
+              <label
+                key={e.key}
+                className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 hover:bg-sunken"
+              >
+                <input
+                  type="checkbox"
+                  className="h-5 w-5 accent-primary"
+                  checked={e.on}
+                  onChange={() => setEvents(events.map((x) => (x.key === e.key ? { ...x, on: !x.on } : x)))}
+                />
+                <span className="min-w-0 flex-1 truncate">{e.name}</span>
+                {e.custom && <span className="text-[12.5px] text-muted">{KIND_LABEL[e.kind]}</span>}
+              </label>
+            ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+            <Input
+              aria-label="Custom event name"
+              value={custom.name}
+              placeholder="Add a custom event, e.g. Men's Doubles 40+"
+              onChange={(e) => setCustom({ ...custom, name: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addCustom();
+                }
+              }}
+            />
+            <Select
+              aria-label="Custom event type"
+              value={custom.kind}
+              onChange={(e) => setCustom({ ...custom, kind: e.target.value as EventKind })}
+            >
+              {KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {v.label}
+                  {KIND_LABEL[k]}
                 </option>
               ))}
             </Select>
-          )}
-        </Field>
+            <Button type="button" onClick={addCustom} disabled={!custom.name.trim()}>
+              Add event
+            </Button>
+          </div>
+          <p className="text-[13px] text-muted">
+            Tick the events you&apos;ll run. The type decides who can enter (men, women, mixed pairs). Fees, caps and draw formats are set
+            per event later.
+          </p>
+        </fieldset>
         <Field
           label="First round scoring"
           hint={

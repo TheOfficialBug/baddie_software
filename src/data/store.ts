@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { STORAGE_KEYS } from '@/config/app';
+import { env } from '@/config/env';
 import { mulberry32 } from '@/engine/rng';
 import type { DrawPlan, Entry, ID, MatchUpdate, Player, Side, SkillLevel, TEvent, Tournament } from '@/engine/types';
 
@@ -131,7 +132,8 @@ const DB_KEYS = Object.keys(emptyDB()) as (keyof DB)[];
 /** The database part of the state (no viewer preferences, no actions). */
 export const selectDB = (s: DB): DB => Object.fromEntries(DB_KEYS.map((k) => [k, s[k]])) as unknown as DB;
 
-const freshState = (): DB & ViewerState => ({ ...buildIowaOpen(), noticesSeenAt: 0 });
+/** With Supabase the data comes from the database (see ./remote), so the app starts empty; demo mode starts with the sample tournament. */
+const freshState = (): DB & ViewerState => ({ ...(env.supabase ? emptyDB() : buildIowaOpen()), noticesSeenAt: 0 });
 
 export const useStore = create<State>()(
   persist(
@@ -172,6 +174,7 @@ export const useStore = create<State>()(
         },
         markNoticesSeen: () => set({ noticesSeenAt: Date.now() }),
         resetDemo: () => {
+          if (env.supabase) return;
           set(freshState());
           toast('Demo data reset');
         },
@@ -399,7 +402,8 @@ export const useStore = create<State>()(
       };
     },
     {
-      name: STORAGE_KEYS.db,
+      // live data isn't kept in the browser (only viewer preferences), and never mixes with demo data
+      name: env.supabase ? `${STORAGE_KEYS.db}.live` : STORAGE_KEYS.db,
       version: STORE_VERSION,
       storage: createJSONStorage(() => ({
         getItem: (k) => safeStorage.get(k),
@@ -409,7 +413,7 @@ export const useStore = create<State>()(
       // Persist data and viewer preferences only; actions are recreated on load.
       partialize: (s) => {
         const out: Partial<State> = { noticesSeenAt: s.noticesSeenAt };
-        for (const k of DB_KEYS) Object.assign(out, { [k]: s[k] });
+        if (!env.supabase) for (const k of DB_KEYS) Object.assign(out, { [k]: s[k] });
         return out;
       },
       // Older saved demos are replaced rather than migrated.
