@@ -23,8 +23,13 @@ export function DrawCheck({ lk, ev, levelOf, warnings }: { lk: Lookup; ev: TEven
   const matchups = new Map<string, number>();
   const clashes: string[] = [];
   let byes = 0;
+  /** byes after round 1, by round: a player who skips round 2, round 3 … (an empty corner of the bracket) */
+  const laterByes = new Map<number, number>();
   if (!isGroups) {
+    for (const m of lk.matchesOfEvent(ev.id).filter((x) => x.stageId === first.id && x.round > 1))
+      if ((m.srcA.kind === 'bye') !== (m.srcB.kind === 'bye')) laterByes.set(m.round, (laterByes.get(m.round) ?? 0) + 1);
     for (const m of lk.matchesOfEvent(ev.id).filter((x) => x.stageId === first.id && x.round === 1)) {
+      if (m.srcA.kind === 'bye' && m.srcB.kind === 'bye') continue;
       if (m.a === 'BYE' || m.b === 'BYE') {
         byes++;
         continue;
@@ -80,6 +85,11 @@ export function DrawCheck({ lk, ev, levelOf, warnings }: { lk: Lookup; ev: TEven
             <span className="num">{byes}</span> bye{byes > 1 ? 's' : ''}
           </span>
         )}
+        {[...laterByes].map(([round, k]) => (
+          <span key={round} className={cn(chip, 'bg-sunken font-normal text-muted')}>
+            <span className="num">{k}</span> round-{round} bye{k > 1 ? 's' : ''}
+          </span>
+        ))}
       </div>
       {(clashes.length > 0 || notes.length > 0) && (
         <ul className="flex flex-col gap-0.5 text-[12.5px] text-warn">

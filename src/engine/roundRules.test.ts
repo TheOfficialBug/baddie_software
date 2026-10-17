@@ -43,11 +43,11 @@ describe('opening-round scoring', () => {
     expect(rulesOf('knockout', entry('e1'), entry('e2'))).toBe('ONE_30');
   });
 
-  it('a player who had a bye plays their first real match in it, even against someone who has played', () => {
-    expect(rulesOf('knockout', winner('m1'), winner('m2'))).toBe('ONE_30');
+  it('only when both players are playing their first match: a bye holder against someone who has played plays full sets', () => {
+    expect(isFirstMatchSlot(winner('m2'), find)).toBe(true);
+    expect(rulesOf('knockout', winner('m1'), winner('m2'))).toBe('BWF_3x21');
     // two players who both had byes
     expect(rulesOf('knockout', winner('m2'), winner('m4'))).toBe('ONE_30');
-    expect(isFirstMatchSlot(winner('m2'), find)).toBe(true);
   });
 
   it('after both players have played, the main rules apply', () => {

@@ -88,3 +88,27 @@ export function resetTournamentDraws(db: DB, tournamentId: ID): DB {
     tournaments: next.tournaments.map((t) => (t.id === tournamentId ? { ...t, status: 'registration', nextMatchNumber: 1 } : t)),
   };
 }
+
+/**
+ * Match numbers (and so score slips) from 1 again, without gaps: each event keeps its block and its own order,
+ * events in the order of their current numbers. Byes stay unnumbered.
+ */
+export function renumberMatches(db: DB, tournamentId: ID): DB {
+  const evIds = new Set(db.events.filter((e) => e.tournamentId === tournamentId).map((e) => e.id));
+  const numbered = db.matches.filter((m) => evIds.has(m.eventId) && m.number > 0);
+  const firstOf = new Map<ID, number>();
+  for (const m of numbered) firstOf.set(m.eventId, Math.min(firstOf.get(m.eventId) ?? Infinity, m.number));
+  const order = [...numbered].sort((x, y) => firstOf.get(x.eventId)! - firstOf.get(y.eventId)! || x.number - y.number);
+  const next = new Map(order.map((m, i) => [m.id, i + 1]));
+  return {
+    ...db,
+    matches: db.matches.map((m) => (next.has(m.id) ? { ...m, number: next.get(m.id)! } : m)),
+    tournaments: db.tournaments.map((t) => (t.id === tournamentId ? { ...t, nextMatchNumber: order.length + 1 } : t)),
+  };
+}
+
+/** Nothing in the tournament has been called to a court or played yet (numbers on slips can still change freely). */
+export function beforeMatchDay(db: DB, tournamentId: ID): boolean {
+  const evIds = new Set(db.events.filter((e) => e.tournamentId === tournamentId).map((e) => e.id));
+  return !db.matches.some((m) => evIds.has(m.eventId) && (played(m) || m.calledAt !== undefined || m.courtId !== undefined));
+}
