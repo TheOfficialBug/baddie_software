@@ -1,6 +1,6 @@
 // Filling free courts in one go: the desk's "Fill free courts" button and the simulator share it.
 import { fairShareTurns } from '@/engine/scheduler';
-import type { ID } from '@/engine/types';
+import type { ID, Match } from '@/engine/types';
 
 import { callToCourt, courtCallNotice } from '@/data/ops';
 import type { DB } from '@/data/types';
@@ -29,7 +29,11 @@ export function fillFreeCourts(
     if (db.matches.some((m) => m.status === 'on_court' && m.courtId === court.id)) continue;
     const mine = db.matches.filter((m) => evIds.has(m.eventId));
     const turn = fairShareTurns(mine);
-    const ready = mine.filter((m) => m.status === 'ready').sort((a, b) => turn(a) - turn(b) || a.number - b.number);
+    // a withdrawn entry's match waits for the desk's walkover instead of being called
+    const out = (e: Match['a']) => db.entries.find((x) => x.id === e)?.status === 'withdrawn';
+    const ready = mine
+      .filter((m) => m.status === 'ready' && !out(m.a) && !out(m.b))
+      .sort((a, b) => turn(a) - turn(b) || a.number - b.number);
     for (const m of ready) {
       const r = callToCourt(db, m.id, court.id, now, { rest: opts.ignoreRest });
       if (!r.db) continue;
