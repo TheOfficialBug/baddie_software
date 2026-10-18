@@ -1,6 +1,7 @@
+import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 
-import type { TEvent, Tournament } from '@/engine/types';
+import type { Match, TEvent, Tournament } from '@/engine/types';
 
 import { useNow } from '@/hooks/useNow';
 import { fmtAgo } from '@/lib/format';
@@ -33,6 +34,8 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
   // changes saved in the editor but not published yet
   const saved = useStore((s) => s.drawDrafts.find((d) => d.eventId === ev.id));
   const now = useNow(30000);
+  // stable, so bracket boxes can skip re-rendering on a live point elsewhere
+  const openMatch = useCallback((m: Match) => m.number > 0 && openScore(m.id), [openScore]);
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
@@ -97,7 +100,7 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
             <Icon name="edit" size={15} /> Tap a match to enter or fix its score. To move players, use Edit placements.
           </p>
           <div className="min-w-0">
-            <EventDraw lk={lk} ev={ev} onOpen={(m) => m.number > 0 && openScore(m.id)} />
+            <EventDraw lk={lk} ev={ev} onOpen={openMatch} />
           </div>
         </>
       )}

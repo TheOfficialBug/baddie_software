@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import type { Match, Side } from '@/engine/types';
@@ -6,7 +6,7 @@ import type { Match, Side } from '@/engine/types';
 import { cn } from '@/lib/cn';
 import { fmtAgo, fmtElapsed } from '@/lib/format';
 
-import type { Lookup } from '@/data/lookup';
+import { type Lookup, sameButMatches } from '@/data/lookup';
 
 import { useShowLevels } from '@/components/draw/showLevels';
 import { DurationTag } from '@/components/match/Duration';
@@ -21,17 +21,20 @@ const involves = (lk: Lookup, m: Match, pid?: string | null) => !!pid && [m.a, m
  * Compact bracket box (Challonge-style): two 24px rows with seed, name and game scores; the match
  * number sits in a narrow gutter that also shows the state (court when live, up next when ready).
  */
-export function BracketMatch({
-  lk,
-  m,
-  highlight,
-  onOpen,
-}: {
+interface BracketMatchProps {
   lk: Lookup;
   m: Match;
   highlight?: string | null;
   onOpen?: (m: Match) => void;
-}) {
+}
+
+// A draw shows dozens of boxes and a live point changes one. A box with both sides known reads no other
+// match, so it keeps its render until its match or the names around it change; an open slot ("Winner of
+// #12") describes other matches and always re-renders.
+const sameBox = (a: BracketMatchProps, b: BracketMatchProps) =>
+  a.m === b.m && !!a.m.a && !!a.m.b && a.highlight === b.highlight && a.onOpen === b.onOpen && sameButMatches(a.lk, b.lk);
+
+export const BracketMatch = memo(function BracketMatch({ lk, m, highlight, onOpen }: BracketMatchProps) {
   const isBye = m.status === 'bye';
   const showLevels = useShowLevels();
   const dim = !!highlight && !involves(lk, m, highlight);
@@ -135,7 +138,7 @@ export function BracketMatch({
       </span>
     </Comp>
   );
-}
+}, sameBox);
 
 /** Full-width match card for lists (schedule, player pages, admin). */
 export function MatchRow({

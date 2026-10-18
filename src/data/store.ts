@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { STORAGE_KEYS } from '@/config/app';
-import { env } from '@/config/env';
+import { env, LIVE_BUILD } from '@/config/env';
 import { mulberry32 } from '@/engine/rng';
 import type { DrawPlan, Entry, ID, MatchUpdate, Player, Side, SkillLevel, TEvent, Tournament } from '@/engine/types';
 
@@ -144,7 +144,7 @@ const DB_KEYS = Object.keys(emptyDB()) as (keyof DB)[];
 export const selectDB = (s: DB): DB => Object.fromEntries(DB_KEYS.map((k) => [k, s[k]])) as unknown as DB;
 
 /** With Supabase the data comes from the database (see ./remote), so the app starts empty; demo mode starts with the sample tournament. */
-const freshState = (): DB & ViewerState => ({ ...(env.supabase ? emptyDB() : buildIowaOpen()), noticesSeenAt: 0, noticesClearedAt: 0 });
+const freshState = (): DB & ViewerState => ({ ...(LIVE_BUILD ? emptyDB() : buildIowaOpen()), noticesSeenAt: 0, noticesClearedAt: 0 });
 
 /** Before anything is called or played, keep match numbers (score slips) running from 1 without gaps. */
 const tidyNumbers = (d: DB, eventId: ID): DB => {

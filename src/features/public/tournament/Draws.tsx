@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { RULES, rulesSummary } from '@/engine/rules';
@@ -49,6 +49,8 @@ export function EventPage() {
     personaId && ev && lk.entriesOfPlayer(personaId).some((e) => e.eventId === ev.id) ? personaId : '',
   );
   const [open, setOpen] = useState<Match | null>(null);
+  // stable, so bracket boxes can skip re-rendering on a live point elsewhere
+  const openMatch = useCallback((m: Match) => m.number && setOpen(m), []);
   const players = useMemo(
     () =>
       ev
@@ -118,7 +120,7 @@ export function EventPage() {
         </p>
       )}
 
-      <EventDraw key={`${ev.id}-${follow}`} lk={lk} ev={ev} highlight={follow || null} onOpen={(m) => m.number && setOpen(m)} />
+      <EventDraw key={`${ev.id}-${follow}`} lk={lk} ev={ev} highlight={follow || null} onOpen={openMatch} />
 
       <Dialog
         open={!!om}

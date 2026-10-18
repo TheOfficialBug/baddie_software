@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import type { Player, Tournament } from '@/engine/types';
+import type { Player, TEvent, Tournament } from '@/engine/types';
 
 import { useNow } from '@/hooks/useNow';
 import { cn } from '@/lib/cn';
@@ -97,29 +97,9 @@ export function PlayersIndex() {
               <span className="num text-[12px] text-faint">{ps.length}</span>
             </div>
             <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {ps.map((p) => {
-                const kinds = lk.entriesOfPlayer(p.id, t.id).map((e) => lk.event(e.eventId)!);
-                return (
-                  <li key={p.id} className="min-w-0">
-                    <Link
-                      to={`/t/${t.slug}/players/${p.id}`}
-                      className="flex min-h-[64px] min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-3 transition-colors hover:border-fg/40"
-                    >
-                      <Avatar name={p.name} size={40} />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold">{p.name}</div>
-                        <div className="truncate text-[13px] text-muted">{p.club}</div>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        {kinds.slice(0, 3).map((ev) => (
-                          <EventChip key={ev.id} kind={ev.kind} />
-                        ))}
-                        {kinds.length > 3 && <span className="num self-center text-[12px] text-muted">+{kinds.length - 3}</span>}
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
+              {ps.map((p) => (
+                <PlayerCard key={p.id} p={p} slug={t.slug} events={lk.entriesOfPlayer(p.id, t.id).map((e) => lk.event(e.eventId)!)} />
+              ))}
             </ul>
           </section>
         ))}
@@ -127,6 +107,33 @@ export function PlayersIndex() {
     </div>
   );
 }
+
+// a live point elsewhere re-renders the index; a card only when its player or their events change
+const PlayerCard = memo(
+  function PlayerCard({ p, slug, events }: { p: Player; slug: string; events: TEvent[] }) {
+    return (
+      <li className="min-w-0">
+        <Link
+          to={`/t/${slug}/players/${p.id}`}
+          className="flex min-h-[64px] min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-3 transition-colors hover:border-fg/40"
+        >
+          <Avatar name={p.name} size={40} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold">{p.name}</div>
+            <div className="truncate text-[13px] text-muted">{p.club}</div>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            {events.slice(0, 3).map((ev) => (
+              <EventChip key={ev.id} kind={ev.kind} />
+            ))}
+            {events.length > 3 && <span className="num self-center text-[12px] text-muted">+{events.length - 3}</span>}
+          </div>
+        </Link>
+      </li>
+    );
+  },
+  (a, b) => a.p === b.p && a.slug === b.slug && a.events.length === b.events.length && a.events.every((ev, i) => ev === b.events[i]),
+);
 
 export function PlayerPage() {
   const { t, lk } = useT();

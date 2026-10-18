@@ -20,7 +20,7 @@ vi.mock('@/lib/supabase', () => ({ getSupabase: () => Promise.resolve(h.fake) })
 // live mode: the store starts empty and keeps no data in the browser
 vi.mock('@/config/env', async (orig) => {
   const { env } = await orig<typeof EnvMod>();
-  return { env: { ...env, supabase: { url: 'https://db.example.com', anonKey: 'anon' } } };
+  return { env: { ...env, supabase: { url: 'https://db.example.com', anonKey: 'anon' } }, LIVE_BUILD: true };
 });
 
 const OFFLINE = { message: 'TypeError: Failed to fetch' };
@@ -216,7 +216,8 @@ describe('live sync', () => {
     expect(m.remote.useRemote.getState().live).toBe(true);
     h.fake.commit('matches', 'm2', match('m2', { live: [2, 0] }));
     h.fake.deliver();
-    expect(localMatch(m, 'm2')?.live).toEqual([2, 0]);
+    // realtime rows are applied in a batch a moment later
+    await vi.waitFor(() => expect(localMatch(m, 'm2')?.live).toEqual([2, 0]));
   });
 
   it('ignores a Realtime event without its data and fetches the record instead', async () => {

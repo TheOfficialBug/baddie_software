@@ -88,7 +88,9 @@ export function applyRows<T extends Pick<DB, SyncedColl>>(db: T, rows: Row[]): T
   const byColl = new Map<SyncedColl, Row[]>();
   for (const r of rows) {
     if (!(r.coll in SYNCED)) continue;
-    byColl.set(r.coll, [...(byColl.get(r.coll) ?? []), r]);
+    const list = byColl.get(r.coll);
+    if (list) list.push(r);
+    else byColl.set(r.coll, [r]);
   }
   if (!byColl.size) return db;
   const next = { ...db };
@@ -149,6 +151,8 @@ const SAFETY_POLL_MS = 60_000;
  * number first but committed after a later one is not skipped. Rows already seen are ignored.
  */
 const OVERLAP = 50;
+/** Realtime rows arriving this close together are applied in one store update (see receive). */
+const INBOX_MS = 40;
 const COLUMNS = 'coll,id,data,deleted,version,client_id';
 /** Unsaved changes are kept in the tab's session storage (per account), so a reload doesn't lose them. */
 const pendingKey = (user: string) => `${STORAGE_KEYS.pending}.${user}`;
@@ -186,6 +190,9 @@ let loadTimer: ReturnType<typeof setTimeout> | undefined;
 let loadDelay = 3000;
 /** Changes the database refused (counted so a caller can tell whether its own change went through). */
 let refusals = 0;
+/** Realtime rows waiting to be applied together. */
+let inbox: Row[] = [];
+let inboxTimer: ReturnType<typeof setTimeout> | undefined;
 
 const isStaff = () => useAuth.getState().access.memberships.length > 0;
 const syncedPart = (s: DB): Pick<DB, SyncedColl> => Object.fromEntries(COLLS.map((c) => [c, s[c]])) as Pick<DB, SyncedColl>;
@@ -338,6 +345,7 @@ export async function reload(): Promise<void> {
     maxVersion = Math.max(maxVersion, max);
     privMaxVersion = 0;
     // A record this device got (or wrote) while the load was under way is newer than what the load read.
+    applyInbox();
     const current = syncedPart(useStore.getState());
     const local = (key: string): Row => {
       const i = key.indexOf(':');
@@ -397,8 +405,12 @@ async function catchUp() {
   }
 }
 
-/** Rows from the database (realtime, catch-up or a refresh). */
-function receive(rows: DbRow[]) {
+/**
+ * Rows from the database (realtime, catch-up or a refresh). Realtime sends one message per row and one desk
+ * action writes several (a result, the matches it decides, the undo record, a notice): realtime rows arriving
+ * within INBOX_MS are applied together, so every open page renders once per action instead of once per row.
+ */
+function receive(rows: DbRow[], batched = false) {
   const fresh: Row[] = [];
   const incomplete: string[] = [];
   for (const r of rows) {
@@ -424,9 +436,17 @@ function receive(rows: DbRow[]) {
     fresh.push(r);
   }
   if (incomplete.length) void refresh(incomplete);
-  if (!fresh.length) return;
-  const next = applyRows(syncedPart(useStore.getState()), fresh);
-  applyToStore(next);
+  inbox.push(...fresh);
+  if (!batched) applyInbox();
+  else if (inbox.length && inboxTimer === undefined) inboxTimer = setTimeout(applyInbox, INBOX_MS);
+}
+
+function applyInbox() {
+  clearTimeout(inboxTimer);
+  inboxTimer = undefined;
+  const rows = inbox;
+  inbox = [];
+  if (rows.length) applyToStore(applyRows(syncedPart(useStore.getState()), rows));
 }
 
 function subscribe() {
@@ -436,7 +456,7 @@ function subscribe() {
   const mine: RealtimeChannel = client
     .channel(`app-${CLIENT_ID}-${++channelSeq}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities' }, (payload) => {
-      if (payload.new && 'coll' in payload.new) receive([payload.new as DbRow]);
+      if (payload.new && 'coll' in payload.new) receive([payload.new as DbRow], true);
     })
     .subscribe((status) => {
       if (channel !== mine) return; // an earlier subscription closing
@@ -471,6 +491,13 @@ function enqueue(user: string, changes: Change[]) {
     const key = rowKey(c);
     queue.set(key, { ...c, base: queue.get(key)?.base ?? versions.get(key) ?? 0 });
   }
+  // a local edit wins over a row still waiting in the inbox; that record is read again once the edit is saved
+  if (inbox.length)
+    inbox = inbox.filter((r) => {
+      if (!queue.has(rowKey(r))) return true;
+      stale.add(rowKey(r));
+      return false;
+    });
   persistQueue();
   setPending();
   void flush();

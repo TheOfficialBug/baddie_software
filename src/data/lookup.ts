@@ -39,25 +39,68 @@ export interface Lookup {
   entryLevel: (id: ID) => number;
   entriesOfPlayer: (pid: ID, tid?: ID) => Entry[];
   courtName: (tid: ID, courtId?: ID) => string;
+  /** The collections this lookup reads (to tell what changed between two lookups, see sameButMatches). */
+  src: LookupSource;
 }
 
 type LookupSource = Pick<DB, 'tournaments' | 'players' | 'entries' | 'events' | 'stages' | 'groups' | 'matches'>;
 
+/**
+ * Two lookups read the same data except, perhaps, the matches. A component that shows one match (and no
+ * other match through the lookup) can skip re-rendering on a live point elsewhere when this holds.
+ */
+export const sameButMatches = (a: Lookup, b: Lookup): boolean =>
+  a === b ||
+  (a.src.tournaments === b.src.tournaments &&
+    a.src.players === b.src.players &&
+    a.src.entries === b.src.entries &&
+    a.src.events === b.src.events &&
+    a.src.stages === b.src.stages &&
+    a.src.groups === b.src.groups);
+
+// Indexes are cached per collection array: the store replaces an array only when it changes, so a live point
+// (a new matches array) rebuilds the match indexes and reuses those of players, entries and events.
+// What a lookup returns is read-only: the same arrays are shared by every lookup until the data changes.
+function cached<T, R>(build: (xs: T[]) => R): (xs: T[]) => R {
+  const cache = new WeakMap<T[], R>();
+  return (xs) => {
+    let r = cache.get(xs);
+    if (r === undefined) cache.set(xs, (r = build(xs)));
+    return r;
+  };
+}
+const indexById = <T extends { id: ID }>(xs: T[]) => new Map(xs.map((x) => [x.id, x]));
+function groupBy<T>(xs: T[], key: (x: T) => ID): Map<ID, T[]> {
+  const out = new Map<ID, T[]>();
+  for (const x of xs) {
+    const list = out.get(key(x));
+    if (list) list.push(x);
+    else out.set(key(x), [x]);
+  }
+  return out;
+}
+const tournamentsById = cached((xs: Tournament[]) => indexById(xs));
+const playersById = cached((xs: Player[]) => indexById(xs));
+const entriesById = cached((xs: Entry[]) => indexById(xs));
+const eventsById = cached((xs: TEvent[]) => indexById(xs));
+const stagesById = cached((xs: Stage[]) => indexById(xs));
+const groupsById = cached((xs: Group[]) => indexById(xs));
+const matchesById = cached((xs: Match[]) => indexById(xs));
+const eventsByTournament = cached((xs: TEvent[]) => groupBy(xs, (e) => e.tournamentId));
+const matchesByEvent = cached((xs: Match[]) => groupBy(xs, (m) => m.eventId));
+const entriesByEvent = cached((xs: Entry[]) => groupBy(xs, (e) => e.eventId));
+
 export function makeLookup(s: LookupSource): Lookup {
-  const map = <T extends { id: ID }>(xs: T[]) => new Map(xs.map((x) => [x.id, x]));
-  const T = map(s.tournaments);
-  const P = map(s.players);
-  const E = map(s.entries);
-  const EV = map(s.events);
-  const ST = map(s.stages);
-  const G = map(s.groups);
-  const M = map(s.matches);
-  const eventsByT = new Map<ID, TEvent[]>();
-  s.events.forEach((e) => eventsByT.set(e.tournamentId, [...(eventsByT.get(e.tournamentId) ?? []), e]));
-  const matchesByE = new Map<ID, Match[]>();
-  s.matches.forEach((m) => matchesByE.set(m.eventId, [...(matchesByE.get(m.eventId) ?? []), m]));
-  const entriesByE = new Map<ID, Entry[]>();
-  s.entries.forEach((e) => entriesByE.set(e.eventId, [...(entriesByE.get(e.eventId) ?? []), e]));
+  const T = tournamentsById(s.tournaments);
+  const P = playersById(s.players);
+  const E = entriesById(s.entries);
+  const EV = eventsById(s.events);
+  const ST = stagesById(s.stages);
+  const G = groupsById(s.groups);
+  const M = matchesById(s.matches);
+  const eventsByT = eventsByTournament(s.events);
+  const matchesByE = matchesByEvent(s.matches);
+  const entriesByE = entriesByEvent(s.entries);
 
   const playersOfEntry = (id?: Slot) => {
     if (!id || id === 'BYE') return [];
@@ -116,6 +159,7 @@ export function makeLookup(s: LookupSource): Lookup {
     entriesOfPlayer: (pid, tid) =>
       s.entries.filter((e) => e.playerIds.includes(pid) && e.status !== 'withdrawn' && (!tid || EV.get(e.eventId)?.tournamentId === tid)),
     courtName: (tid, courtId) => T.get(tid)?.courts.find((c) => c.id === courtId)?.name ?? 'Court',
+    src: s,
   };
   return lk;
 }
@@ -133,5 +177,14 @@ export function useLookup(): Lookup {
       matches: s.matches,
     })),
   );
-  return useMemo(() => makeLookup(src), [src]);
+  return useMemo(() => sharedLookup(src), [src]);
+}
+
+/** Components reading the same data share one lookup (a page and its tabs, the desk's panels). */
+let last: { src: LookupSource; lk: Lookup } | null = null;
+function sharedLookup(src: LookupSource): Lookup {
+  const prev = last;
+  if (prev && (Object.keys(src) as (keyof LookupSource)[]).every((k) => prev.src[k] === src[k])) return prev.lk;
+  last = { src, lk: makeLookup(src) };
+  return last.lk;
 }
