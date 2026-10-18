@@ -13,6 +13,7 @@ import {
   drawPlaces,
   extraBoxes,
   heldEntries,
+  isLowerFlight,
   movedEntries,
   movesByes,
   type PlaceBox,
@@ -60,10 +61,12 @@ type Dragged = { entry: ID; from?: string };
  * onto another to swap them. Changes stay on this device until published; players who have played
  * stay put.
  */
-export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone: () => void }) {
+export function DrawEditor({ lk, ev, stageId, onDone }: { lk: Lookup; ev: TEvent; stageId?: string; onDone: () => void }) {
   const rearrange = useStore((s) => s.rearrangeDraw);
+  // a lower flight (B, C, D) edits its own decided lines; otherwise the starting draw
+  const flight = stageId && isLowerFlight(selectDB(useStore.getState()), stageId) ? stageId : undefined;
   // the draw's places from the stored data (stages, groups and matches of this event)
-  const places = useMemo(() => drawPlaces(selectDB(useStore.getState()), ev.id), [lk, ev.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const places = useMemo(() => drawPlaces(selectDB(useStore.getState()), ev.id, flight), [lk, ev.id, flight]); // eslint-disable-line react-hooks/exhaustive-deps
   const original = useMemo(() => seatingOf(places), [places]);
   const sig = JSON.stringify(original);
   const saveDraft = useStore((s) => s.saveDrawDraft);
@@ -75,7 +78,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
   const base: Seating = savedDraft?.seating ?? original;
   const fresh: Draft = { sig, seating: base };
   // edits not saved yet are kept on this device as you go, so a reload loses nothing
-  const [stored, setStored, clearDraft] = usePersistentState<Draft>(`drawEdit:${ev.id}`, fresh);
+  const [stored, setStored, clearDraft] = usePersistentState<Draft>(`drawEdit:${ev.id}${flight ? `:${flight}` : ''}`, fresh);
   const draft = stored.sig === sig ? stored : fresh;
   const unsaved = JSON.stringify(draft.seating) !== JSON.stringify(base);
   const now = useNow(30000);
@@ -104,10 +107,12 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
   // late entries: accepted after the draw was made, waiting for a place (a bye line or a withdrawn player's spot)
   const inDraw = new Set(Object.values(original).filter(Boolean));
   const seatedNow = new Set(Object.values(draft.seating).filter(Boolean));
-  const late = lk
-    .entriesOf(ev.id)
-    .filter((e) => e.status === 'accepted' && !inDraw.has(e.id))
-    .map((e) => e.id);
+  const late = flight
+    ? [] // late entries start in the first flight
+    : lk
+        .entriesOf(ev.id)
+        .filter((e) => e.status === 'accepted' && !inDraw.has(e.id))
+        .map((e) => e.id);
   const latePlaced = late.filter((e) => seatedNow.has(e));
   const held = [
     ...taken,
@@ -214,7 +219,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
         onDone();
         break;
       case 'publish': {
-        const err = rearrange(ev.id, draft.seating);
+        const err = rearrange(ev.id, draft.seating, flight);
         if (err) {
           toast(err, { tone: 'error' });
           break;
@@ -329,7 +334,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
   // (not with added lines: the rebuilt round 1 has more lines than the one being edited)
   const preview = useMemo(() => {
     if (taken.length || !changes || extras.length) return lk;
-    const r = rearrangeDraw(selectDB(useStore.getState()), ev.id, draft.seating);
+    const r = rearrangeDraw(selectDB(useStore.getState()), ev.id, draft.seating, flight);
     return r.db ? makeLookup(r.db) : lk;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lk, ev.id, draft.seating]);
@@ -430,6 +435,12 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
           style={{ top: 'calc(env(safe-area-inset-top, 0px) + 72px)' }}
         >
           {toolbar}
+          {flight && !places.boxes.length && (
+            <p className="border-t border-line bg-surface p-4 text-[14px] text-muted">
+              Nothing in this flight can be moved right now: its first-round places are either still waiting for results upstream, or their
+              matches have already started.
+            </p>
+          )}
         </div>
       )}
       {extras.length > 0 && (

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { Match, TEvent, Tournament } from '@/engine/types';
@@ -30,12 +30,18 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
   // ?edit=1 opens the placement editor (linked from the tournament home)
   const [params, setParams] = useSearchParams();
   const editing = params.get('edit') === '1';
-  const setEditing = (on: boolean) => setParams(on ? { edit: '1' } : {}, { replace: true });
+  // the flight tab on show: Edit placements works on that flight (B, C, D) or on the starting draw
+  const [flight, setFlight] = useState<string | undefined>();
+  const lower = flight ? lk.stage(flight) : undefined;
+  const lowerFlight = lower && lower.order > 0 && !lower.placement ? lower : undefined;
+  const setEditing = (on: boolean) =>
+    setParams(on ? { edit: '1', ...(lowerFlight ? { flight: lowerFlight.id } : {}) } : {}, { replace: true });
   // changes saved in the editor but not published yet
   const saved = useStore((s) => s.drawDrafts.find((d) => d.eventId === ev.id));
   const now = useNow(30000);
   // stable, so bracket boxes can skip re-rendering on a live point elsewhere
-  const openMatch = useCallback((m: Match) => m.number > 0 && openScore(m.id), [openScore]);
+  // any real match opens for scoring (a match without a number yet must still be scoreable)
+  const openMatch = useCallback((m: Match) => m.status !== 'bye' && m.a !== 'BYE' && m.b !== 'BYE' && openScore(m.id), [openScore]);
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="panel flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
@@ -54,7 +60,7 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
         <div className="flex flex-wrap gap-2">
           {!editing && (
             <Button size="sm" variant="primary" icon={<Icon name="edit" size={16} />} onClick={() => setEditing(true)}>
-              {saved ? 'Continue editing' : 'Edit placements'}
+              {saved ? 'Continue editing' : lowerFlight ? `Edit Flight ${lowerFlight.flight} placements` : 'Edit placements'}
             </Button>
           )}
           <ButtonLink size="sm" to={`/t/${t.slug}/draws/${ev.id}`} icon={<Icon name="external" size={16} />}>
@@ -82,7 +88,7 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
       </div>
       {dialog}
       {editing ? (
-        <DrawEditor lk={lk} ev={ev} onDone={() => setEditing(false)} />
+        <DrawEditor lk={lk} ev={ev} stageId={params.get('flight') ?? undefined} onDone={() => setEditing(false)} />
       ) : (
         <>
           {saved && (
@@ -100,7 +106,7 @@ export function PublishedDraw({ lk, t, ev }: { lk: Lookup; t: Tournament; ev: TE
             <Icon name="edit" size={15} /> Tap a match to enter or fix its score. To move players, use Edit placements.
           </p>
           <div className="min-w-0">
-            <EventDraw lk={lk} ev={ev} onOpen={openMatch} />
+            <EventDraw lk={lk} ev={ev} onOpen={openMatch} onFlight={setFlight} />
           </div>
         </>
       )}

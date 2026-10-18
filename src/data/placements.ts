@@ -44,8 +44,35 @@ export interface DrawPlaces {
 
 const started = (m: Match) => m.status === 'finished' || m.status === 'on_court';
 
-/** Starting places of an event's published draw. */
-export function drawPlaces(db: DB, eventId: ID): DrawPlaces {
+/** A flight after the first (B, C, D …): its players come from results rather than the draw. */
+export function isLowerFlight(db: DB, stageId: ID | undefined): boolean {
+  const s = stageId ? db.stages.find((x) => x.id === stageId) : undefined;
+  return !!s && s.kind === 'knockout' && s.order > 0 && !s.placement;
+}
+
+/**
+ * Places in a lower flight: its first-round lines whose players are already known (someone dropped in, or it is
+ * settled as a bye) and whose match hasn't started. Only players who have started a match in this flight stay put.
+ */
+function flightPlaces(db: DB, stageId: ID): DrawPlaces {
+  const ms = db.matches.filter((m) => m.stageId === stageId);
+  const locked = new Set<ID>();
+  for (const m of ms) if (started(m)) for (const e of [m.a, m.b]) if (e && e !== 'BYE') locked.add(e);
+  const boxes: PlaceBox[] = ms
+    .filter((m) => m.round === 1 && m.a !== null && m.b !== null && !started(m))
+    .sort((a, b) => a.index - b.index)
+    .map((m) => ({
+      id: m.id,
+      kind: 'line',
+      title: m.number > 0 ? `#${m.number}` : `Line ${m.index + 1}`,
+      places: (['a', 'b'] as const).map((side) => ({ key: `${m.id}:${side}`, entryId: (m[side] as ID | 'BYE') ?? 'BYE' })),
+    }));
+  return { boxes, locked, byesMovable: true };
+}
+
+/** Starting places of an event's published draw (or, with `stageId` of a lower flight, of that flight). */
+export function drawPlaces(db: DB, eventId: ID, stageId?: ID): DrawPlaces {
+  if (stageId && isLowerFlight(db, stageId)) return flightPlaces(db, stageId);
   const matches = db.matches.filter((m) => m.eventId === eventId);
   const stages = db.stages.filter((s) => s.eventId === eventId).sort((a, b) => a.order - b.order);
   const locked = new Set<ID>();
@@ -147,7 +174,8 @@ export function movedEntries(original: Seating, draft: Seating): { entryId: ID; 
  * put. Without moving byes, matches keep their ids and numbers and later rounds are worked out
  * again; when byes move, the structure is rebuilt (see rebuildFromLines).
  */
-export function rearrangeDraw(db: DB, eventId: ID, draft: Seating): OpResult {
+export function rearrangeDraw(db: DB, eventId: ID, draft: Seating, stageId?: ID): OpResult {
+  if (stageId && isLowerFlight(db, stageId)) return rearrangeFlight(db, eventId, stageId, draft);
   const p = drawPlaces(db, eventId);
   const original = seatingOf(p);
   const keys = Object.keys(original);
@@ -185,6 +213,40 @@ export function rearrangeDraw(db: DB, eventId: ID, draft: Seating): OpResult {
       if (m.groupId) return { ...m, srcA: rename(m.srcA), srcB: rename(m.srcB) };
       return { ...m, srcA: swap(m.srcA, `${m.id}:a`), srcB: swap(m.srcB, `${m.id}:b`) };
     }),
+  };
+  const ev = db.events.find((e) => e.id === eventId);
+  return { db: ev ? resolveTournament(next, ev.tournamentId) : next };
+}
+
+/**
+ * Publish moves in a lower flight: each changed place is pinned to its new player (or to a bye when left empty)
+ * instead of following results, and the flight is worked out again. Nothing else is rebuilt, so results already
+ * played anywhere stay as they are.
+ */
+function rearrangeFlight(db: DB, eventId: ID, stageId: ID, draft: Seating): OpResult {
+  const p = flightPlaces(db, stageId);
+  const original = seatingOf(p);
+  const keys = Object.keys(original);
+  const withdrawn = new Set(db.entries.filter((e) => e.eventId === eventId && e.status === 'withdrawn').map((e) => e.id));
+  if (heldEntries(original, draft).some((e) => !withdrawn.has(e))) return { error: 'Place everyone from the holding area first.' };
+  const placed = keys.map((k) => draft[k]).filter(Boolean);
+  if (new Set(placed).size !== placed.length) return { error: 'Each player can only be in one place.' };
+  const changed = keys.filter((k) => (draft[k] ?? null) !== (original[k] ?? null));
+  if (changed.some((k) => [original[k], draft[k]].some((e) => e && p.locked.has(e))))
+    return { error: 'Players who have already played in this flight stay where they are.' };
+  if (!changed.length) return { db };
+  const pin = new Map(changed.map((k) => [k, draft[k] ?? null]));
+  const at = (m: Match, side: 'a' | 'b', s: SlotSource): SlotSource => {
+    const k = `${m.id}:${side}`;
+    if (!pin.has(k)) return s;
+    const e = pin.get(k);
+    return e ? { kind: 'entry', entryId: e } : { kind: 'bye' };
+  };
+  const next: DB = {
+    ...db,
+    matches: db.matches.map((m) =>
+      m.stageId !== stageId || m.round !== 1 ? m : { ...m, srcA: at(m, 'a', m.srcA), srcB: at(m, 'b', m.srcB) },
+    ),
   };
   const ev = db.events.find((e) => e.id === eventId);
   return { db: ev ? resolveTournament(next, ev.tournamentId) : next };

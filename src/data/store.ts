@@ -72,7 +72,7 @@ interface Actions {
   publishDraw: (eventId: ID, plan: DrawPlan, rngSeed: number, seedOrder: ID[]) => void;
   clearDraw: (eventId: ID) => void;
   /** Publish hand-made changes to who starts where in a draw. Returns an error message or null. */
-  rearrangeDraw: (eventId: ID, seating: Seating) => string | null;
+  rearrangeDraw: (eventId: ID, seating: Seating, stageId?: ID) => string | null;
   /** Keep edits to a published draw without publishing them (`base` = the seating they start from). */
   saveDrawDraft: (eventId: ID, base: string, seating: Seating, by?: ID) => void;
   discardDrawDraft: (eventId: ID) => void;
@@ -275,8 +275,8 @@ export const useStore = create<State>()(
           commit({ ...resolved, notices: [...resolved.notices, ops.drawPublishedNotice(ev, Date.now())] });
         },
         clearDraw: (eventId) => commit(tidyNumbers(ops.clearDraw(db(), eventId), eventId)),
-        rearrangeDraw: (eventId, seating) => {
-          const r = rearrangeDraw(db(), eventId, seating);
+        rearrangeDraw: (eventId, seating, stageId) => {
+          const r = rearrangeDraw(db(), eventId, seating, stageId);
           if (!r.db) return r.error;
           r.db = tidyNumbers(r.db, eventId);
           const ev = r.db.events.find((e) => e.id === eventId)!;

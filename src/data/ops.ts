@@ -47,8 +47,21 @@ export function resolveTournament(db: DB, tournamentId: ID): DB {
     groups: db.groups.filter((g) => eventIds.has(g.eventId)),
     rulesFor: (id) => groupRulesOf(db, id),
   });
+  // A match that was a bye when the draw was numbered can turn into a real one later (a player drops into an
+  // empty line). It needs a number too, or it can't be found, printed or scored: give it the next free one.
+  const t = db.tournaments.find((x) => x.id === tournamentId);
   const byId = new Map(resolved.map((m) => [m.id, m]));
-  return { ...db, matches: db.matches.map((m) => byId.get(m.id) ?? m) };
+  let next = Math.max(t?.nextMatchNumber ?? 1, 1 + Math.max(0, ...resolved.map((m) => m.number)));
+  const start = next;
+  for (const m of resolved)
+    if (m.number === 0 && m.status !== 'bye' && m.srcA.kind !== 'bye' && m.srcB.kind !== 'bye' && m.a !== null && m.b !== null)
+      byId.set(m.id, { ...m, number: next++ });
+  const renumbered = next !== start;
+  return {
+    ...db,
+    matches: db.matches.map((m) => byId.get(m.id) ?? m),
+    tournaments: renumbered ? db.tournaments.map((x) => (x.id === tournamentId ? { ...x, nextMatchNumber: next } : x)) : db.tournaments,
+  };
 }
 
 export function publishPlan(db: DB, eventId: ID, plan: DrawPlan, rngSeed: number): DB {

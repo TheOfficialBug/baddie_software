@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { Match, Stage, TEvent } from '@/engine/types';
 
@@ -37,11 +37,14 @@ export function EventDraw({
   ev,
   highlight,
   onOpen,
+  onFlight,
 }: {
   lk: Lookup;
   ev: TEvent;
   highlight?: string | null;
   onOpen?: (m: Match) => void;
+  /** Called with the stage of the flight tab being shown (drop flights). */
+  onFlight?: (stageId: string | undefined) => void;
 }) {
   const stages = lk.stagesOf(ev.id);
   const matches = lk.matchesOfEvent(ev.id);
@@ -61,7 +64,8 @@ export function EventDraw({
       />
     );
 
-  if (ev.mode === 'drop_flight') return <DropFlight lk={lk} stages={stages} byStage={byStage} highlight={highlight} onOpen={onOpen} />;
+  if (ev.mode === 'drop_flight')
+    return <DropFlight lk={lk} stages={stages} byStage={byStage} highlight={highlight} onOpen={onOpen} onFlight={onFlight} />;
 
   if (ev.mode === 'round_robin') {
     const gs = stages.find((s) => s.kind === 'group')!;
@@ -115,12 +119,14 @@ function DropFlight({
   byStage,
   highlight,
   onOpen,
+  onFlight,
 }: {
   lk: Lookup;
   stages: Stage[];
   byStage: Map<string, Match[]>;
   highlight?: string | null;
   onOpen?: (m: Match) => void;
+  onFlight?: (stageId: string | undefined) => void;
 }) {
   const variant = stages.some((s) => s.placement) ? 'PLACEMENT' : stages.some((s) => s.flight === 'C') ? 'ABCD' : 'AB';
   // One tab per flight; the placement rounds share one tab, drawn as a tree.
@@ -148,6 +154,8 @@ function DropFlight({
     return tabs[0].id;
   });
   const tab = tabs.find((t) => t.id === sel) ?? tabs[0];
+  const shownStage = tab.stages.length === 1 ? tab.stages[0].id : undefined;
+  useEffect(() => onFlight?.(shownStage), [shownStage, onFlight]);
 
   return (
     <div className="flex flex-col gap-2.5">

@@ -234,3 +234,23 @@ describe('corrections that would change a match already under way', () => {
     expect(get(ops.returnToQueue(db, m.id), m.id)).toEqual(m);
   });
 });
+
+describe('match numbers', () => {
+  it('a match that turns from a bye into a real one gets the next free number (so it can be scored and printed)', () => {
+    const db = buildDemo(new Date('2026-10-08T15:00:00').getTime());
+    const t = db.tournaments.find((x) => x.status === 'live')!;
+    const evIds = new Set(db.events.filter((e) => e.tournamentId === t.id).map((e) => e.id));
+    const victim = db.matches.find((m) => evIds.has(m.eventId) && m.status === 'ready' && m.number > 0)!;
+    const max = Math.max(...db.matches.filter((m) => evIds.has(m.eventId)).map((m) => m.number));
+    // as if it had been a bye when the draw was numbered
+    const lost = { ...db, matches: db.matches.map((m) => (m.id === victim.id ? { ...m, number: 0 } : m)) };
+    const next = ops.resolveTournament(lost, t.id);
+    const fixed = next.matches.find((m) => m.id === victim.id)!;
+    expect(fixed.number).toBeGreaterThan(max);
+    expect(next.tournaments.find((x) => x.id === t.id)!.nextMatchNumber).toBe(fixed.number + 1);
+    // nothing else is renumbered
+    expect(next.matches.filter((m) => m.id !== victim.id).map((m) => m.number)).toEqual(
+      lost.matches.filter((m) => m.id !== victim.id).map((m) => m.number),
+    );
+  });
+});
