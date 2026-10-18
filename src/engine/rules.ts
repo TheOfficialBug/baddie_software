@@ -102,6 +102,21 @@ export interface GameCheck {
   message?: string;
 }
 
+/**
+ * The winner's score of a finished game when the loser's score is typed (score-slip autofill), or null when it
+ * can't be told. Games to 21 (deuce, cap 30): up to 19 → 21; 20 → 22; 22–28 → two more; 29 → 30. Exactly 21
+ * is almost always the winner being typed, and the cap can't be a loser's score, so those fill nothing.
+ * Without deuce (cap = points to win, e.g. one game to 30): anything below → the winning score.
+ */
+export function otherScore(v: number, r: ScoringRules): number | null {
+  const P = r.pointsToWin;
+  const C = r.cap;
+  if (!Number.isInteger(v) || v < 0 || v >= C) return null;
+  if (C === P || v < P - 1) return P;
+  if (v === P) return null;
+  return Math.min(v + 2, C); // deuce: two clear (20 → 22, 27 → 29), or the next point at the cap (28 and 29 → 30)
+}
+
 /** Is (x, y) a legal finished game, a legal in-progress game, or impossible? */
 export function checkGame([x, y]: GameScore, r: ScoringRules): GameCheck {
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {

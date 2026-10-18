@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { checkGame, checkMatch, defaultRulesForDate, parseQuickScore, RULES, type ScoringRules } from './rules';
+import { checkGame, checkMatch, defaultRulesForDate, otherScore, parseQuickScore, RULES, type ScoringRules } from './rules';
 import type { GameScore } from './types';
 
 // ---------------------------------------------------------------------------
@@ -348,5 +348,39 @@ describe('defaultRulesForDate', () => {
     ['2028-06-01', 'BWF_3x15'],
   ])('%s → %s', (date, rules) => {
     expect(defaultRulesForDate(date)).toBe(rules);
+  });
+});
+
+describe('otherScore (autofill the winning side)', () => {
+  const r21 = RULES.BWF_3x21;
+  it('fills the winner of a game to 21', () => {
+    expect(otherScore(0, r21)).toBe(21);
+    expect(otherScore(15, r21)).toBe(21);
+    expect(otherScore(19, r21)).toBe(21);
+    expect(otherScore(20, r21)).toBe(22);
+    expect(otherScore(27, r21)).toBe(29);
+    expect(otherScore(28, r21)).toBe(30);
+    expect(otherScore(29, r21)).toBe(30);
+  });
+  it('treats a typed score as the loser’s: past 21 the winner is two clear', () => {
+    expect(otherScore(22, r21)).toBe(24);
+    expect(otherScore(23, r21)).toBe(25);
+  });
+  it('leaves the winner’s 21 and the cap alone', () => {
+    expect(otherScore(21, r21)).toBeNull();
+    expect(otherScore(30, r21)).toBeNull();
+    expect(otherScore(31, r21)).toBeNull();
+  });
+  it('one game to 30 (no deuce): any lower score means the other side has 30', () => {
+    expect(otherScore(29, RULES.ONE_30)).toBe(30);
+    expect(otherScore(12, RULES.ONE_30)).toBe(30);
+    expect(otherScore(30, RULES.ONE_30)).toBeNull();
+  });
+  it('every filled score makes a valid finished game', () => {
+    for (const r of Object.values(RULES))
+      for (let v = 0; v <= r.cap; v++) {
+        const o = otherScore(v, r);
+        if (o !== null) expect(checkGame([v, o], r).complete, `${r.id} ${v}-${o}`).toBe(true);
+      }
   });
 });

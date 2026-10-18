@@ -48,3 +48,51 @@ describe('score slip', () => {
     expect(gameBoxes()[0]).toHaveValue('12');
   });
 });
+
+describe('score slip autofill', () => {
+  // a best-of-3 match with nothing typed or played yet (a live score would rightly be kept)
+  const fresh = db.matches.find(
+    (m) => playable(m) && rulesOfMatch(db, m).bestOf === 3 && !m.games.length && !(m.live && (m.live[0] || m.live[1])),
+  )!;
+  // boxes in order: game 1 side a, game 1 side b, game 2 side a, … (one column per game)
+  const box = (game: number, side: 'a' | 'b') =>
+    gameBoxes().find(
+      (b) =>
+        b.getAttribute('aria-label')!.startsWith(`Game ${game},`) &&
+        gameBoxes()
+          .filter((x) => x.getAttribute('aria-label')!.startsWith(`Game ${game},`))
+          .indexOf(b) === (side === 'a' ? 0 : 1),
+    )! as HTMLInputElement;
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('typing the loser’s score fills the winner’s, and follows the typing', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    render(<ScoreForm matchId={fresh.id} onDone={() => {}} />);
+    fireEvent.change(box(1, 'a'), { target: { value: '15' } });
+    expect(box(1, 'b').value).toBe('21');
+    // "2" then "20": the filled box follows (21 → 22)
+    fireEvent.change(box(2, 'b'), { target: { value: '2' } });
+    expect(box(2, 'a').value).toBe('21');
+    fireEvent.change(box(2, 'b'), { target: { value: '20' } });
+    expect(box(2, 'a').value).toBe('22');
+    // clearing the typed score takes the guess back
+    fireEvent.change(box(2, 'b'), { target: { value: '' } });
+    expect(box(2, 'a').value).toBe('');
+  });
+
+  it('never changes a score typed by hand, and leaves a typed 21 alone', async () => {
+    const { fireEvent } = await import('@testing-library/react');
+    render(<ScoreForm matchId={fresh.id} onDone={() => {}} />);
+    fireEvent.change(box(1, 'b'), { target: { value: '21' } });
+    expect(box(1, 'a').value).toBe('');
+    fireEvent.change(box(1, 'a'), { target: { value: '18' } });
+    expect(box(1, 'b').value).toBe('21');
+    // overwrite the filled box by hand, then change the other side: the hand-typed score stays
+    fireEvent.change(box(1, 'b'), { target: { value: '25' } });
+    fireEvent.change(box(1, 'a'), { target: { value: '23' } });
+    expect(box(1, 'b').value).toBe('25');
+  });
+});

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { checkGame, checkMatch, parseQuickScore } from '@/engine/rules';
+import { checkGame, checkMatch, otherScore, parseQuickScore } from '@/engine/rules';
 import type { GameScore, ResultType, Side } from '@/engine/types';
 
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -75,6 +75,8 @@ export function ScoreForm({
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
   const first = useRef<HTMLInputElement>(null);
+  /** Boxes filled in by autofill ("game-side"), so they can be updated or taken back while the other side is typed. */
+  const autoFilled = useRef(new Set<string>());
 
   useEffect(() => {
     if (window.matchMedia?.('(min-width: 768px)').matches) first.current?.focus();
@@ -129,12 +131,30 @@ export function ScoreForm({
 
   const setCell = (gi: number, side: 0 | 1, v: string) => {
     const clean = v.replace(/\D/g, '').slice(0, 2);
-    setCells((c) => c.map((g, i) => (i === gi ? (side === 0 ? [clean, g[1]] : [g[0], clean]) : g)));
+    const other = side === 0 ? 1 : 0;
+    // autofill: typing one side's score fills the other with the winning score (15 → 21, 20 → 22), but only a box
+    // that is empty or was filled this way; whatever was typed by hand is never changed
+    const mine = `${gi}-${side}`;
+    const theirs = `${gi}-${other}`;
+    const fill = result === 'normal' && clean !== '' && rules ? otherScore(Number(clean), rules) : null;
+    const row: string[] = [...cells[gi]];
+    row[side] = clean;
+    const free = row[other] === '' || autoFilled.current.has(theirs);
+    if (free && fill !== null) {
+      row[other] = String(fill);
+      autoFilled.current.add(theirs);
+    } else if (free && autoFilled.current.has(theirs)) {
+      row[other] = ''; // the typed score was cleared or can't be told: take the guess back
+      autoFilled.current.delete(theirs);
+    }
+    setCells(cells.map((g, i) => (i === gi ? row : g)));
+    autoFilled.current.delete(mine);
     setError(null);
   };
 
   const applyQuick = (text: string) => {
     setQuick(text);
+    autoFilled.current.clear();
     const parsed = parseQuickScore(text);
     if (parsed.length) setCells(Array.from({ length: n }, (_, i) => (parsed[i] ? [String(parsed[i][0]), String(parsed[i][1])] : ['', ''])));
   };
