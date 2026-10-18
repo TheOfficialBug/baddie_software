@@ -28,7 +28,7 @@ export function FinishedStage({ lk, t, p }: { lk: Lookup; t: Tournament; p: Prog
         </ButtonLink>
       </div>
       {rows.length ? (
-        <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map(({ ev, c }) => (
             <li key={`${ev.id}-${c.label}`} className="panel flex min-w-0 items-center gap-3 p-4">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary text-primary-fg">

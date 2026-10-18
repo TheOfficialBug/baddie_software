@@ -122,7 +122,7 @@ export function AdminHome() {
             }
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {shown.map((t) => (
               <TournamentCard key={t.id} lk={lk} t={t} />
             ))}

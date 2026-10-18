@@ -96,7 +96,7 @@ export function PlayersIndex() {
               <span className="h-px flex-1 bg-line" aria-hidden />
               <span className="num text-[12px] text-faint">{ps.length}</span>
             </div>
-            <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
               {ps.map((p) => {
                 const kinds = lk.entriesOfPlayer(p.id, t.id).map((e) => lk.event(e.eventId)!);
                 return (
@@ -207,7 +207,7 @@ export function PlayerDetail({
       <section>
         <SectionHead title="Events" description={entries.length ? undefined : 'Not entered in any events yet.'} />
         {entries.length > 0 && (
-          <ul className="grid gap-2.5 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
             {entries.map((e) => {
               const ev = lk.event(e.eventId)!;
               const st = eventStatus(lk, ev, p.id);
@@ -246,7 +246,7 @@ export function PlayerDetail({
       {upcoming.length > 0 && (
         <section>
           <SectionHead title="Next up" description="Your name is highlighted. Head to the court when the desk calls you." />
-          <div className="grid gap-2.5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
             {upcoming.map((m) => (
               <MatchRow key={m.id} lk={lk} m={m} now={now} highlight={p.id} to={`/t/${t.slug}/draws/${m.eventId}`} />
             ))}
@@ -257,7 +257,7 @@ export function PlayerDetail({
       <section>
         <SectionHead title="Results" description={done.length ? `${won} won, ${done.length - won} lost` : undefined} />
         {done.length ? (
-          <div className="grid gap-2.5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
             {done.map((m) => (
               <MatchRow key={m.id} lk={lk} m={m} now={now} highlight={p.id} to={`/t/${t.slug}/draws/${m.eventId}`} />
             ))}

@@ -439,7 +439,7 @@ export function DrawEditor({ lk, ev, onDone }: { lk: Lookup; ev: TEvent; onDone:
             them a bye; their opponent gets a bye too unless you fill that place. Empty lines are ignored. After you publish, the placement
             rounds are rebuilt and renumbered.
           </p>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {extras.map((b) => (
               <div key={b.id} className="flex items-center gap-1.5">
                 <div className="min-w-0 flex-1">

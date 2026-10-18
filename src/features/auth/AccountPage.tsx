@@ -98,7 +98,7 @@ function PasswordForm() {
     }
   };
   return (
-    <form onSubmit={save} noValidate className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={save} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {error && (
         <p role="alert" className="text-[14px] font-medium text-live sm:col-span-2">
           {error}

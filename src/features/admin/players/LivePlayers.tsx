@@ -238,7 +238,7 @@ export function LivePlayers() {
           body={arrival === 'waiting' && !query && filter === 'all' ? 'Every player has checked in.' : 'Try another filter or search.'}
         />
       ) : (
-        <ul className="grid gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-3">
           {shown.map((p) => (
             <PlayerRow
               key={p.id}

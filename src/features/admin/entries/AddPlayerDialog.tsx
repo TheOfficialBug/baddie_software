@@ -146,7 +146,7 @@ export function AddPlayerDialog({ lk, t, onClose }: { lk: Lookup; t: Tournament;
       }
     >
       <div className="grid gap-5">
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <Field
             label="Name"
             hint={existing ? `${existing.name} is already in the tournament: these entries are added to them.` : 'First and last name.'}
@@ -175,7 +175,7 @@ export function AddPlayerDialog({ lk, t, onClose }: { lk: Lookup; t: Tournament;
         </div>
 
         {!existing && (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label="Club">
               {(id) => (
                 <Combobox

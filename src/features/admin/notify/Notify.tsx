@@ -117,7 +117,7 @@ export function Notify() {
       />
       {dialog}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <NotifyComposer
           events={lk.eventsOf(t.id)}
           tpl={tpl}

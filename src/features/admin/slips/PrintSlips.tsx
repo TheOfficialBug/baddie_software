@@ -83,7 +83,7 @@ export function PrintSlips() {
         <Empty icon="print" title="No slips to print" body="Pick another list, or call matches to courts first." />
       ) : (
         <div className="rounded-[18px] bg-sunken p-3 sm:p-5 print:rounded-none print:bg-transparent print:p-0">
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3 print:grid-cols-2 print:gap-0">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3 print:grid-cols-2 print:gap-0">
             {list.slice(0, MAX).map((m) => (
               <Slip key={m.id} lk={lk} t={t} m={m} />
             ))}

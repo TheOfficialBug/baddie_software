@@ -174,7 +174,7 @@ function PartnerFields({
           You'll be listed as looking for a partner. The organizer pairs players of a similar level before the draw.
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Partner's name" required error={errors.partnerName} className={d.partnerId ? 'sm:col-span-2' : undefined}>
             {(id) => (
               <Combobox

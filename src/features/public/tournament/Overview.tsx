@@ -74,7 +74,7 @@ export function Overview() {
               }
             />
             {onCourt.length ? (
-              <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                 {onCourt.map(({ court, match }) => (
                   <CourtCard key={court.id} lk={lk} court={court} match={match} now={now} />
                 ))}
@@ -84,7 +84,7 @@ export function Overview() {
             )}
           </section>
 
-          <div className="grid items-start gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
             <section className="panel min-w-0 py-2" aria-label="Up next">
               <h2 className="px-5 py-3 font-display text-[20px] font-bold">Up next</h2>
               <ol>
@@ -135,7 +135,7 @@ export function Overview() {
 
       <section aria-label="Events">
         <SectionHead title="Events" description="Tap an event to see its full draw." />
-        <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
           {events.map((e) => (
             <EventCard key={e.id} lk={lk} t={t} ev={e} />
           ))}

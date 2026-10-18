@@ -251,7 +251,7 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
         </div>
       </section>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section aria-label="Courts" className="grid grid-cols-1 content-start gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
           {t.courts.map((c) => {
             const m = onCourt(c);

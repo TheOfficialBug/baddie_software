@@ -70,7 +70,7 @@ export function Home() {
         {others.length > 0 && (
           <section>
             <SectionHead title="More tournaments" />
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {others.map((t) => (
                 <TournamentCard key={t.id} lk={lk} t={t} />
               ))}
@@ -112,7 +112,7 @@ export function Home() {
         <ShuttleArt />
       </section>
 
-      <section aria-label="What would you like to do?" className="grid gap-3 md:grid-cols-3">
+      <section aria-label="What would you like to do?" className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {paths.map((p, i) => (
           <Link key={p.title} to={p.to} className="panel panel-hover group flex flex-col gap-3 p-5">
             <span
@@ -138,7 +138,7 @@ export function Home() {
       {live.length > 0 && (
         <section>
           <SectionHead title="Live now" />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {live.map((t) => (
               <TournamentCard key={t.id} lk={lk} t={t} />
             ))}
@@ -148,7 +148,7 @@ export function Home() {
       {open.length > 0 && (
         <section>
           <SectionHead title="Coming up" />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {open.map((t) => (
               <TournamentCard key={t.id} lk={lk} t={t} />
             ))}
@@ -158,7 +158,7 @@ export function Home() {
       {done.length > 0 && (
         <section>
           <SectionHead title="Recent results" />
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {done.map((t) => (
               <TournamentCard key={t.id} lk={lk} t={t} />
             ))}

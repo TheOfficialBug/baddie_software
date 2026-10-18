@@ -29,7 +29,7 @@ export function DrawsIndex() {
   return (
     <section>
       <SectionHead title="Draws" description="Pick an event to see its bracket, groups or flights." />
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
         {lk.eventsOf(t.id).map((ev) => (
           <EventCard key={ev.id} lk={lk} t={t} ev={ev} />
         ))}

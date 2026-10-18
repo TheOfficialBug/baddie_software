@@ -117,7 +117,7 @@ export function Schedule() {
 
       {shown.length ? (
         <>
-          <ol className="grid gap-2.5 lg:grid-cols-2">
+          <ol className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
             {shown.slice(0, limit).map((m, i) => (
               <li key={m.id} className="flex min-w-0 items-stretch gap-2.5">
                 {view === 'next' && (
