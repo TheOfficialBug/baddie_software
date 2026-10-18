@@ -294,38 +294,65 @@ function feederBracket(eventId: ID, key: string, name: string, order: number, fl
   return { stage, matches: buildBracket(stage, lines) };
 }
 
-/** A flight fed in place: line i is the loser of feeder match i (tournamentsoftware keeps draw positions). */
-function positionalFeeder(eventId: ID, key: string, name: string, order: number, flight: Stage['flight'], feeders: Match[], label: string) {
-  if (realMatches(feeders).length < 1) return null;
-  const real = new Set(realMatches(feeders).map((m) => m.id));
-  const size = Math.max(2, nextPow2(feeders.length));
+/**
+ * A tournamentsoftware plate: line i takes whoever started in `origins[i]` (a first-round match of another flight)
+ * and loses their `nth` match there, so each player drops on the line of the match they came from. Lines whose
+ * first-round match is empty stay byes.
+ */
+function dropFeeder(eventId: ID, key: string, name: string, order: number, flight: Stage['flight'], origins: Match[], nth: 1 | 2) {
+  if (!origins.length) return null;
+  const size = Math.max(2, nextPow2(origins.length));
   const lines: SlotSource[] = Array.from({ length: size }, (_, i) => {
-    const m = feeders[i];
-    if (!m || !real.has(m.id)) return { kind: 'bye' };
-    m.loserTo = label;
-    return { kind: 'loser', matchId: m.id };
+    const o = origins[i];
+    if (!o || (isByeSrc(o.srcA) && isByeSrc(o.srcB))) return { kind: 'bye' };
+    if (nth === 1) o.loserTo ??= name;
+    return { kind: 'drop', matchId: o.id, nth };
   });
   const stage = makeStage(eventId, key, name, order, size, flight);
   return { stage, matches: buildBracket(stage, lines) };
 }
 
-/** tournamentsoftware "Triple Plate": Plate (B), Special Plate (C), Consolation Plate (D), all in draw position. */
+/**
+ * tournamentsoftware's Special Plate: second-match losers of A. First-round match j of the plate pairs the loser of A
+ * round-3 match k = (M − 2 − j) / 2 (first line, even j only) with the loser of A round-2 match j (second line) (M = round-2 matches), each only if
+ * it was that player's second match: a player whose first match was in round 2 or 3 (after byes) meets someone from
+ * the other side of the draw.
+ */
+function specialPlate(eventId: ID, a2: Match[], a3: Match[]) {
+  const r2 = [...a2].sort((a, b) => a.index - b.index);
+  const r3 = [...a3].sort((a, b) => a.index - b.index);
+  const M = r2.length;
+  if (M < 1) return null;
+  const lines: SlotSource[] = [];
+  for (let j = 0; j < M; j++) {
+    const k = j % 2 === 0 ? (M - 2 - j) / 2 : -1;
+    lines.push(k >= 0 && r3[k] ? { kind: 'loser', matchId: r3[k].id, nth: 2 } : { kind: 'bye' });
+    lines.push({ kind: 'loser', matchId: r2[j].id, nth: 2 });
+  }
+  const size = Math.max(2, nextPow2(lines.length));
+  while (lines.length < size) lines.push({ kind: 'bye' });
+  const stage = makeStage(eventId, 'C', 'C flight', 2, size, 'C');
+  return { stage, matches: buildBracket(stage, lines) };
+}
+
+/**
+ * tournamentsoftware "Triple Plate", sized and fed like the site: Plate (B) = first-match losers of A (one line per A
+ * first-round match), Special Plate (C) = second-match losers of A (see specialPlate), Consolation Plate (D) =
+ * first-match losers of B (one line per B first-round match). A bye in round 1 doesn't count as a match, so a player who had one and
+ * loses in round 2 drops to the Plate, on their own line.
+ */
 function triplePlate(eventId: ID, aMatches: Match[]): { stages: Stage[]; matches: Match[]; warnings: string[] } {
   const byIndex = (ms: Match[]) => [...ms].sort((a, b) => a.index - b.index);
   const out = { stages: [] as Stage[], matches: [] as Match[], warnings: [] as string[] };
-  const B = positionalFeeder(eventId, 'B', 'B flight', 1, 'B', byIndex(roundOf(aMatches, 1)), 'B flight');
-  const C = positionalFeeder(eventId, 'C', 'C flight', 2, 'C', byIndex(roundOf(aMatches, 2)), 'C flight');
-  const D = B ? positionalFeeder(eventId, 'D', 'D flight', 3, 'D', byIndex(roundOf(B.matches, 1)), 'D flight') : null;
-  for (const [f, key] of [
-    [B, 'B'],
-    [C, 'C'],
-    [D, 'D'],
-  ] as const) {
+  const a1 = byIndex(roundOf(aMatches, 1));
+  const B = dropFeeder(eventId, 'B', 'B flight', 1, 'B', a1, 1);
+  const C = specialPlate(eventId, roundOf(aMatches, 2), roundOf(aMatches, 3));
+  const D = B ? dropFeeder(eventId, 'D', 'D flight', 3, 'D', byIndex(roundOf(B.matches, 1)), 1) : null;
+  for (const f of [B, C, D])
     if (f) {
       out.stages.push(f.stage);
       out.matches.push(...f.matches);
-    } else out.warnings.push(`Nobody can drop into the ${key} flight with this draw (too many byes).`);
-  }
+    }
   return out;
 }
 

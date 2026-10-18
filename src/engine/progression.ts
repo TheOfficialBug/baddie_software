@@ -12,6 +12,7 @@ export interface ResolveContext {
 /** Returns new match objects with a/b/status/winner brought up to date. Pure. */
 export function resolveMatches(matches: Match[], ctx: ResolveContext): Match[] {
   const byId = new Map(matches.map((m) => [m.id, { ...m }]));
+  const parent = parentMap(matches);
   const groupMatches = new Map<ID, Match[]>();
   const groupById = new Map(ctx.groups.map((g) => [g.id, g]));
   const groupRankCache = new Map<ID, ID[] | null>();
@@ -49,14 +50,52 @@ export function resolveMatches(matches: Match[], ctx: ResolveContext): Match[] {
         return 'BYE';
       case 'winner':
         return out(byId.get(s.matchId), 'winner');
-      case 'loser':
-        return out(byId.get(s.matchId), 'loser');
+      case 'loser': {
+        const m = byId.get(s.matchId);
+        const l = out(m, 'loser');
+        if (!s.nth || !m || l === null || l === 'BYE') return l;
+        // how many real matches the loser had played in this flight, this one included
+        let n = 1;
+        for (const x of byId.values())
+          if (x.stageId === m.stageId && x.round < m.round && x.status === 'finished' && x.a !== 'BYE' && x.b !== 'BYE' && (x.a === l || x.b === l)) n++;
+        return n === s.nth ? l : 'BYE';
+      }
+      case 'drop':
+        return dropOf(s.matchId, s.nth);
       case 'group': {
         const r = groupRanking(s.groupId);
         if (!r) return null;
         return r[s.rank - 1] ?? 'BYE';
       }
     }
+  };
+
+  /** Follow the players of first-round match `origin` up its bracket: who loses their nth real match there. */
+  const dropOf = (origin: ID, nth: number): Slot => {
+    let cur = byId.get(origin);
+    if (!cur) return null;
+    if (cur.a === null || cur.b === null) return null;
+    let alive = [cur.a, cur.b].filter((x): x is ID => x !== 'BYE');
+    if (!alive.length) return 'BYE';
+    const played = new Map<ID, number>();
+    while (cur) {
+      const here = alive.filter((c) => c === cur!.a || c === cur!.b);
+      if (!here.length) return cur.a === null || cur.b === null ? null : 'BYE';
+      alive = here;
+      if (cur.a === null || cur.b === null) return null;
+      if (cur.a !== 'BYE' && cur.b !== 'BYE') {
+        if (cur.status !== 'finished' || !cur.winner) return null;
+        const w = cur[cur.winner] as ID;
+        const l = cur[cur.winner === 'a' ? 'b' : 'a'] as ID;
+        for (const c of alive) played.set(c, (played.get(c) ?? 0) + 1);
+        if (alive.includes(l) && played.get(l) === nth) return l;
+        alive = alive.filter((c) => c === w);
+        if (!alive.length || (played.get(w) ?? 0) >= nth) return 'BYE';
+      }
+      const up = parent.get(cur.id);
+      cur = up ? byId.get(up) : undefined;
+    }
+    return 'BYE';
   };
 
   for (let pass = 0; pass < matches.length + 2; pass++) {
@@ -98,6 +137,7 @@ function layers(matches: Match[], groups: Group[]): Map<ID, number> {
   const memo = new Map<ID, number>();
   const srcLayer = (s: SlotSource): number => {
     if (s.kind === 'winner' || s.kind === 'loser') return layerOf(byId.get(s.matchId)!);
+    if (s.kind === 'drop') return layerOf(byId.get(s.matchId)!) + s.nth;
     if (s.kind === 'group') {
       if (!groupLayer.has(s.groupId)) {
         const ms = matches.filter((m) => m.groupId === s.groupId);
@@ -138,13 +178,31 @@ export function assignNumbers(matches: Match[], stages: Stage[], groups: Group[]
   return { matches: matches.map((m) => ({ ...m, number: num.get(m.id) ?? 0 })), next: n };
 }
 
+/** Match → the match its winner moves on to. */
+function parentMap(matches: Match[]): Map<ID, ID> {
+  const up = new Map<ID, ID>();
+  for (const m of matches) for (const s of [m.srcA, m.srcB]) if (s.kind === 'winner') up.set(s.matchId, m.id);
+  return up;
+}
+
+/** The matches a drop source watches: its first-round match and every match its winner can reach. */
+export function dropPath(origin: ID, matches: Match[]): ID[] {
+  const up = parentMap(matches);
+  const path: ID[] = [];
+  for (let id: ID | undefined = origin; id; id = up.get(id)) path.push(id);
+  return path;
+}
+
 /** Matches whose participants depend on this match's result (directly or through byes / groups). */
 export function dependents(matchId: ID, matches: Match[]): Match[] {
   const target = matches.find((m) => m.id === matchId);
+  const watches = (s: SlotSource) => s.kind === 'drop' && dropPath(s.matchId, matches).includes(matchId);
   const direct = matches.filter(
     (m) =>
       ((m.srcA.kind === 'winner' || m.srcA.kind === 'loser') && m.srcA.matchId === matchId) ||
       ((m.srcB.kind === 'winner' || m.srcB.kind === 'loser') && m.srcB.matchId === matchId) ||
+      watches(m.srcA) ||
+      watches(m.srcB) ||
       (!!target?.groupId &&
         ((m.srcA.kind === 'group' && m.srcA.groupId === target.groupId) || (m.srcB.kind === 'group' && m.srcB.groupId === target.groupId))),
   );

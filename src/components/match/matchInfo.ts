@@ -33,6 +33,14 @@ export function slotPlaceholder(lk: Lookup, m: Match, side: Side): string {
     }
     return 'To be decided';
   }
+  if (src.kind === 'drop') {
+    // tournamentsoftware plates: whoever from that first-round match loses their 1st (or 2nd) match
+    const from = lk.match(src.matchId);
+    const who = from ? [from.a, from.b].filter((x): x is string => !!x && x !== 'BYE') : [];
+    if (src.nth === 1 && from?.number && who.length === 2) return `Loser of #${from.number}`;
+    if (who.length === 1) return `${lk.entryName(who[0])}, if knocked out`;
+    return src.nth === 1 ? 'First-match loser' : 'Second-match loser';
+  }
   if (src.kind === 'group') return `${lk.group(src.groupId)?.name ?? 'Group'} ${src.rank === 1 ? 'winner' : 'runner-up'}`;
   if (src.kind === 'bye') return 'Bye';
   return 'To be decided';

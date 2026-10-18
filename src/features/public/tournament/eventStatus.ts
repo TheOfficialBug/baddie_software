@@ -18,7 +18,9 @@ export function eventStatus(lk: Lookup, ev: TEvent, playerId: string): { text: s
       (m) =>
         m.status === 'pending' &&
         [m.srcA, m.srcB].some(
-          (s) => (s.kind === 'winner' || s.kind === 'loser') && mine.some((x) => x.id === s.matchId && x.status === 'finished'),
+          (s) =>
+            ((s.kind === 'winner' || s.kind === 'loser') && mine.some((x) => x.id === s.matchId && x.status === 'finished')) ||
+            s.kind === 'drop',
         ),
     );
   const cur = open ?? last;

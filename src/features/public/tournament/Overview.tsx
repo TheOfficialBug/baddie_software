@@ -7,6 +7,7 @@ import type { EventKind, Match } from '@/engine/types';
 import { useNow } from '@/hooks/useNow';
 
 import { useQueue } from '@/data/queries';
+import { registrationOpen } from '@/data/registration';
 
 import { CourtCard } from '@/components/match/CourtCard';
 import { ResultLine } from '@/components/match/Match';
@@ -22,6 +23,7 @@ import { FilterChips } from '@/components/ui/Tabs';
 
 import { ChampionsPanel, Following, RegistrationOverview } from '@/features/public/tournament/OverviewPanels';
 import { useT } from '@/features/public/tournament/tournamentContext';
+import { TournamentProgress } from '@/features/public/tournament/TournamentProgress';
 
 export function Overview() {
   const { t, lk } = useT();
@@ -40,12 +42,14 @@ export function Overview() {
     .sort((a, b) => b.finishedAt! - a.finishedAt!)
     .slice(0, 6);
 
-  if (t.status === 'registration' || t.status === 'closed') return <RegistrationOverview />;
+  // the event list with fees is only for entering; after that the page is about what's happening
+  if (registrationOpen(t) || (t.status === 'registration' && !matches.length)) return <RegistrationOverview />;
 
   return (
     <div className="flex flex-col gap-6 sm:gap-6">
       <AnnouncementBanner tournamentId={t.id} />
       <Following />
+      <TournamentProgress t={t} lk={lk} />
 
       {t.status === 'completed' && <ChampionsPanel />}
 

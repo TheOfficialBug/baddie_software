@@ -90,5 +90,6 @@ export function waitingFor(lk: Lookup, m: Match) {
     .map((s) => (s.kind === 'winner' || s.kind === 'loser' ? lk.match(s.matchId) : undefined))
     .filter((x) => x && x.status !== 'finished' && x.status !== 'bye') as Match[];
   if (src.length) return `Waiting for ${src.map((x) => `#${x.number}`).join(' and ')} to finish`;
+  if (m.srcA.kind === 'drop' || m.srcB.kind === 'drop') return 'Waiting for players to drop from the flight above';
   return 'Waiting for group results';
 }

@@ -24,7 +24,13 @@ export type SlotSource =
   | { kind: 'entry'; entryId: ID }
   | { kind: 'bye' }
   | { kind: 'winner'; matchId: ID }
-  | { kind: 'loser'; matchId: ID }
+  /** `nth`: only if that was the loser's nth match in its flight (byes don't count); otherwise a bye. */
+  | { kind: 'loser'; matchId: ID; nth?: 1 | 2 }
+  /**
+   * Drop flights the tournamentsoftware way: whoever started in first-round match `matchId` (of another flight)
+   * and loses their `nth` match there (byes don't count). A bye if that never happens.
+   */
+  | { kind: 'drop'; matchId: ID; nth: 1 | 2 }
   | { kind: 'group'; groupId: ID; rank: number };
 
 /** A resolved slot: an entry id, a bye, or not yet known (null). */
