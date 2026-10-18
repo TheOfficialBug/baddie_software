@@ -20,6 +20,7 @@ import { byEvent, type EventFilterValue } from '@/components/tournament/filterBy
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { Segmented } from '@/components/ui/Tabs';
 import { useConfirm } from '@/components/ui/useConfirm';
 
@@ -28,9 +29,12 @@ import { ConflictDialog } from '@/features/admin/courts/ConflictDialog';
 import { BusyCourt, FreeCourt } from '@/features/admin/courts/CourtTiles';
 import { MiniRow, QueueRow, RecentRow } from '@/features/admin/courts/QueueRows';
 
+/** Lower case without accents, so "jose" finds "José". */
+const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /**
  * Match day on one screen: progress per event (also the event filter), every court with live
- * scores, and the call queue. Fill free courts in one tap, or drag / tap Call for a specific match.
+ * scores, and the call queue (searchable). Fill free courts in one tap, or drag / tap Call for a specific match.
  */
 export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
   const now = useNow(10000);
@@ -67,6 +71,24 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
     .sort((a, b) => b.finishedAt! - a.finishedAt!)
     .slice(0, 12);
   const suggested = queueShown.find((q) => !q.blocked && !q.resting) ?? queueShown.find((q) => !q.blocked);
+
+  // search the queue by player, partner, event or match number (only narrows the lists; calling order is unchanged)
+  const [search, setSearch] = useState('');
+  const needle = fold(search.trim());
+  const hit = (m: Match) => {
+    if (!needle) return true;
+    const num = needle.replace(/^#/, '');
+    if (/^\d+$/.test(num)) return String(m.number).startsWith(num);
+    const names = [m.a, m.b].filter((x): x is string => !!x && x !== 'BYE').map((id) => lk.entryName(id));
+    return fold(`${names.join(' ')} ${lk.event(m.eventId)?.name ?? ''}`).includes(needle);
+  };
+  const queueListed = queueShown.filter((q) => hit(q.match));
+  const waitingListed = waiting.filter(hit);
+  const recentListed = needle
+    ? byEvent(matches, shown)
+        .filter((m) => m.status === 'finished' && hit(m))
+        .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))
+    : recent;
 
   const done = matches.filter((m) => m.status === 'finished').length;
   const left = matches.length - done;
@@ -275,25 +297,26 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
           className="panel flex min-h-[420px] flex-col overflow-hidden xl:sticky xl:top-24 xl:max-h-[calc(100dvh-120px)]"
           aria-label="Match queue"
         >
-          <div className="border-b border-line p-3">
+          <div className="flex flex-col gap-2 border-b border-line p-3">
             <Segmented
               label="Queue"
               value={tab}
               onChange={setTab}
               stretch
               options={[
-                { value: 'ready', label: 'Up next', count: queueShown.length },
-                { value: 'waiting', label: 'Later', count: waiting.length },
-                { value: 'recent', label: 'Done', count: recent.length },
+                { value: 'ready', label: 'Up next', count: queueListed.length },
+                { value: 'waiting', label: 'Later', count: waitingListed.length },
+                { value: 'recent', label: 'Done', count: recentListed.length },
               ]}
             />
+            <SearchInput value={search} onChange={setSearch} placeholder="Search player, team or match #" label="Search the match queue" />
           </div>
           <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-2">
             {tab === 'ready' &&
-              (queueShown.length ? (
+              (queueListed.length ? (
                 <>
                   <p className="px-3 pb-2 pt-1 text-[13px] text-muted">In call order. Drag onto a free court, or tap Call.</p>
-                  {queueShown.map((q) => (
+                  {queueListed.map((q) => (
                     <QueueRow
                       key={q.match.id}
                       lk={lk}
@@ -307,15 +330,26 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
                 </>
               ) : (
                 <p className="p-4 text-[14px] text-muted">
-                  {left === 0 ? 'Every match is played.' : 'No matches are ready. They appear as soon as both sides are known.'}
+                  {needle
+                    ? `Nothing ready matches “${search.trim()}”. Try the Later or Done tab.`
+                    : left === 0
+                      ? 'Every match is played.'
+                      : 'No matches are ready. They appear as soon as both sides are known.'}
                 </p>
               ))}
-            {tab === 'waiting' && waiting.slice(0, 40).map((m) => <MiniRow key={m.id} lk={lk} m={m} sub={waitingFor(lk, m)} />)}
-            {tab === 'recent' &&
-              (recent.length ? (
-                recent.map((m) => <RecentRow key={m.id} lk={lk} m={m} now={now} />)
+            {tab === 'waiting' &&
+              (waitingListed.length || !needle ? (
+                waitingListed.slice(0, 40).map((m) => <MiniRow key={m.id} lk={lk} m={m} sub={waitingFor(lk, m)} />)
               ) : (
-                <p className="p-4 text-[14px] text-muted">Results show up here as you enter them.</p>
+                <p className="p-4 text-[14px] text-muted">Nothing waiting matches “{search.trim()}”.</p>
+              ))}
+            {tab === 'recent' &&
+              (recentListed.length ? (
+                recentListed.map((m) => <RecentRow key={m.id} lk={lk} m={m} now={now} />)
+              ) : (
+                <p className="p-4 text-[14px] text-muted">
+                  {needle ? `No finished match matches “${search.trim()}”.` : 'Results show up here as you enter them.'}
+                </p>
               ))}
           </div>
           <div className="border-t border-line p-2">
