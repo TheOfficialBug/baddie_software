@@ -77,3 +77,9 @@ export function parseEnv(raw: RawEnv, isPreviewBuild = false): Env {
 }
 
 export const env: Env = parseEnv(import.meta.env as RawEnv, typeof __ARTIFACT__ !== 'undefined' && __ARTIFACT__);
+
+/**
+ * Whether this build was made with Supabase settings, as a constant the bundler can see: code used only in demo
+ * mode (the sample tournament) is left out of live builds. Same answer as `!!env.supabase` (parseEnv refuses half a config).
+ */
+export const LIVE_BUILD = !!import.meta.env.VITE_SUPABASE_URL?.trim();
