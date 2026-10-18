@@ -36,7 +36,17 @@ describe('redirects', () => {
   it('accepts in-app paths only', () => {
     expect(safeNext('/admin/t/1')).toBe('/admin/t/1');
     expect(safeNext(encodeURIComponent('/t/x/register?a=1'))).toBe('/t/x/register?a=1');
-    for (const bad of ['https://evil.example', '//evil.example', '/\\evil.example', 'javascript:alert(1)', '/login', '%E0%A4%A']) {
+    for (const bad of [
+      '/\t/evil.example',
+      '/%09/evil.example',
+      '%2F%0A%2Fevil.example',
+      'https://evil.example',
+      '//evil.example',
+      '/\\evil.example',
+      'javascript:alert(1)',
+      '/login',
+      '%E0%A4%A',
+    ]) {
       expect(safeNext(bad)).toBeNull();
     }
   });

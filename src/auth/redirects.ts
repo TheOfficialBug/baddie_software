@@ -10,6 +10,9 @@ export function safeNext(next: string | null | undefined): string | null {
   } catch {
     return null;
   }
+  // browsers drop tabs and newlines from URLs, so "/\t/evil.example" would become "//evil.example"
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(path)) return null;
   if (!path.startsWith('/') || path.startsWith('//') || path.startsWith('/\\') || /^\/+[a-z]+:/i.test(path)) return null;
   if (/^\/(login|signup|forgot-password|reset-password|auth\/)/.test(path)) return null;
   return path;
