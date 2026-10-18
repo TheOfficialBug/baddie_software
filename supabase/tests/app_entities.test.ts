@@ -254,6 +254,17 @@ describe('security hardening', () => {
     );
   });
 
+  it("a named partner's email never reaches the public entry", async () => {
+    await as('owner', () =>
+      put('entries', 'e-named', {
+        eventId: 'ev1',
+        playerIds: ['p-imported'],
+        pendingPartner: { name: 'Pat', email: 'pat@example.com', level: 'B' },
+      }),
+    );
+    expect((await read('entries', 'e-named'))?.pendingPartner).toEqual({ name: 'Pat', level: 'B' });
+  });
+
   it('a deleted record keeps only its id, and a deleted player takes their email along', async () => {
     await as('owner', async () => {
       await put('players', 'p-gone', { name: 'Gone Player', birthYear: 1990 });
