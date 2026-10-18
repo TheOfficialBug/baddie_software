@@ -73,8 +73,11 @@ export function applyTsResults(db: DB, tournamentId: ID, results: TsResult[], no
                 games: r.walkover ? [] : games,
                 result: r.walkover ? 'walkover' : 'normal',
                 live: null,
-                calledAt: x.calledAt ?? now,
-                startedAt: r.walkover ? undefined : (x.startedAt ?? now),
+                // the site doesn't say when it was played or for how long: no call/start time, so no made-up
+                // durations and no rest clock running from the import
+                calledAt: undefined,
+                startedAt: undefined,
+                courtId: undefined,
                 finishedAt: now,
               }
             : x,
