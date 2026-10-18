@@ -258,7 +258,7 @@ export function ScoreForm({
                             onChange={(e) => setCell(gi, s, e.target.value)}
                             onFocus={(e) => e.target.select()}
                             className={cn(
-                              'num h-[60px] w-full max-w-[76px] rounded-[14px] border-[1.5px] bg-bg text-center text-[26px] font-semibold outline-none transition-colors focus:border-accent focus:ring-[3px] focus:ring-primary/25',
+                              'input-big num h-[60px] w-full max-w-[76px] rounded-[14px] border-[1.5px] bg-bg text-center text-[26px] font-semibold outline-none transition-colors focus:border-accent focus:ring-[3px] focus:ring-primary/25',
                               bad ? 'border-live bg-live-soft' : good ? 'border-ok' : 'border-line',
                             )}
                           />

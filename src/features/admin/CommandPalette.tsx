@@ -79,7 +79,7 @@ export function CommandPalette({
             }}
             placeholder="Match number or player name"
             aria-label="Match number or player name"
-            className="h-16 min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-faint"
+            className="input-big h-16 min-w-0 flex-1 bg-transparent text-[17px] outline-none placeholder:text-faint"
           />
           <button onClick={onClose} className="rounded-full px-2 py-1 text-[12px] font-semibold text-muted hover:bg-sunken">
             Esc

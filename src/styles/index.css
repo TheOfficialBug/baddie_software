@@ -167,9 +167,10 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
-  /* 16px inputs on phones stop iOS from zooming the page on focus */
+  /* 16px inputs on phones stop iOS from zooming the page on focus.
+     Inputs already set larger (score boxes, steppers) opt out with .input-big so they keep their size. */
   @media (max-width: 639px) {
-    input,
+    input:not(.input-big),
     select,
     textarea {
       font-size: 16px !important;
