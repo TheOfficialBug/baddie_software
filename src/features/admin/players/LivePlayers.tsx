@@ -322,11 +322,14 @@ function PlayerRow({
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={p.name} size={38} />
+        {/* the narrowest phones give the room to the name: the desk checks people in by it */}
+        <Avatar name={p.name} size={38} className="hidden xs:inline-flex" />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 items-start gap-2 sm:items-center">
             {marks && <CheckInMark checkedIn={here} />}
-            <span className={cn('truncate text-[15px] font-semibold', !here && 'text-muted')}>{p.name}</span>
+            <span className={cn('min-w-0 break-words text-[15px] font-semibold leading-snug sm:truncate', !here && 'text-muted')}>
+              {p.name}
+            </span>
             <span className="shrink-0 rounded-full bg-sunken px-1.5 text-[11px] font-bold text-muted" title={`Skill level ${p.level}`}>
               {p.level}
             </span>
