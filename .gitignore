@@ -34,3 +34,4 @@ Thumbs.db
 
 # real tournament files for dev:scenario (names of real players): never committed
 /local/
+.claude/worktrees/

@@ -6,4 +6,4 @@ package-lock.json
 supabase/migrations
 *.md
 local
-.claude/skills
+.claude

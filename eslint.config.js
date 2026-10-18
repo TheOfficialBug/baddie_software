@@ -8,7 +8,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   // local/: machine-only tooling and real tournament files (git-ignored)
-  { ignores: ['dist', 'dist-artifact', 'coverage', 'node_modules', 'local'] },
+  { ignores: ['dist', 'dist-artifact', 'coverage', 'node_modules', 'local', '.claude'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.recommended],
