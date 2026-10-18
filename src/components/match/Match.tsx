@@ -226,7 +226,7 @@ export function MatchRow({
       </div>
     </>
   );
-  const cls = 'block w-full rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors';
+  const cls = 'block w-full min-w-0 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-colors';
   if (to)
     return (
       <Link to={to} className={cn(cls, 'hover:border-fg/40')}>
