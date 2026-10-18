@@ -51,7 +51,7 @@ export function PublicShell() {
                 end={n.end}
                 className={({ isActive }) =>
                   cn(
-                    'flex min-h-11 items-center rounded-full px-4 text-[14px] font-semibold transition-colors',
+                    'flex min-h-11 items-center rounded-full px-3 text-[14px] font-semibold transition-colors lg:px-4',
                     isActive ? 'bg-surface text-fg shadow-lift' : 'text-muted hover:text-fg',
                   )
                 }
