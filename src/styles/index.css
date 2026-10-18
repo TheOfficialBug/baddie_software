@@ -332,6 +332,15 @@
       padding-bottom: 56px;
     }
   }
+  /* The organizer desk keeps its bottom bar on tablets too */
+  .pb-safe-bar-lg {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  }
+  @media (min-width: 1024px) {
+    .pb-safe-bar-lg {
+      padding-bottom: 56px;
+    }
+  }
   /* Responsive page gutter: 12px on the smallest phones, 16px phones, 24px tablets, 32px desktops.
      Safe-area insets keep content clear of notches on phones held sideways. */
   .gutter {

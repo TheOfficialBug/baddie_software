@@ -16,6 +16,7 @@ import { NoticeBell } from '@/components/notices/Notices';
 import { LiveDot, Pill } from '@/components/tournament/Badges';
 import { PlayerSearch } from '@/components/tournament/PlayerSearch';
 import { BackButton } from '@/components/ui/BackButton';
+import { BottomBar } from '@/components/ui/BottomBar';
 import { ButtonLink } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
@@ -23,7 +24,7 @@ import { TabLinks } from '@/components/ui/Tabs';
 import { ThemeSwitchButton } from '@/components/ui/ThemeToggle';
 
 import { AccountMenu } from '@/features/auth/AccountMenu';
-import { BottomBar, Footer } from '@/features/public/PublicShell';
+import { Footer } from '@/features/public/PublicShell';
 import type { TCtx } from '@/features/public/tournament/tournamentContext';
 
 /** Public tournament page (design: "Public live page" + "Public live — phone"). */
