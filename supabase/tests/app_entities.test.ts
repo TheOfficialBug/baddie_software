@@ -217,3 +217,50 @@ describe('waitlist', () => {
     expect(rows).toEqual([{ name: 'Ada', email: 'ada@example.com' }]);
   });
 });
+
+describe('security hardening', () => {
+  it('a signed-in account cannot make itself an organizer', async () => {
+    await rejects(
+      () =>
+        as('other', () => db.query(`insert into public.organizations (name, slug, created_by) values ('Mine', 'mine', $1)`, [users.other])),
+      /permission denied/,
+    );
+    const org = (await db.query<{ id: string }>(`select id from public.organizations where slug = 'smashboard'`)).rows[0].id;
+    await rejects(
+      () =>
+        as('other', () =>
+          db.query(`insert into public.organization_members (organization_id, user_id, role) values ($1, $2, 'owner')`, [org, users.other]),
+        ),
+      /permission denied/,
+    );
+    expect(await as('other', async () => (await db.query<{ r: string | null }>(`select public.app_role() r`)).rows[0].r)).toBeNull();
+  });
+
+  it('the browser roles cannot empty tables or reach the normalized schema and internal functions', async () => {
+    await rejects(() => as('anon', () => db.query(`truncate public.app_entities`)), /permission denied/);
+    await rejects(() => as('owner', () => db.query(`truncate public.app_entities`)), /permission denied/);
+    await rejects(() => as('anon', () => db.query(`select * from public.tournaments`)), /permission denied/);
+    await rejects(() => as('owner', () => db.query(`select * from public.matches`)), /permission denied/);
+    await rejects(() => as('anon', () => db.query(`select public.org_role(gen_random_uuid())`)), /permission denied/);
+    await rejects(() => as('owner', () => db.query(`select public.claim_my_player()`)), /permission denied/);
+  });
+
+  it('registrations are staff only', async () => {
+    await as('anon', async () =>
+      expect((await db.query(`select 1 from public.app_entities where coll = 'registrations'`)).rows).toHaveLength(0),
+    );
+    await as('owner', async () =>
+      expect((await db.query(`select 1 from public.app_entities where coll = 'registrations'`)).rows).toHaveLength(1),
+    );
+  });
+
+  it('a deleted record keeps only its id, and a deleted player takes their email along', async () => {
+    await as('owner', async () => {
+      await put('players', 'p-gone', { name: 'Gone Player', birthYear: 1990 });
+      await db.query(`insert into public.app_private (id, data) values ('p-gone', '{"email":"gone@example.com"}')`);
+      await db.query(`update public.app_entities set deleted = true where coll = 'players' and id = 'p-gone'`);
+    });
+    expect(await read('players', 'p-gone')).toEqual({ id: 'p-gone' });
+    expect((await db.query(`select 1 from public.app_private where id = 'p-gone'`)).rows).toHaveLength(0);
+  });
+});
