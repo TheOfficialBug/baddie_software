@@ -17,7 +17,8 @@ const counts = (m: Match) => m.number > 0 && m.status !== 'bye';
 /** Where a flight stands: its champion once the final is in, else the earliest round still being played. */
 function flightNow(lk: Lookup, st: Stage, ms: Match[]): { text: string; done: boolean; live: boolean } {
   const mine = ms.filter((m) => m.stageId === st.id);
-  const final = mine.find((m) => m.round === st.rounds);
+  // a placement round only sorts players into flights: it has no champion
+  const final = st.placement ? undefined : mine.find((m) => m.round === st.rounds);
   if (final?.status === 'finished' && final.winner) return { text: lk.entryName(final[final.winner] as string), done: true, live: false };
   const open = mine.filter((m) => counts(m) && m.status !== 'finished').sort((a, b) => a.round - b.round)[0];
   if (!open) return { text: mine.some(counts) ? 'Waiting' : 'No matches', done: false, live: false };

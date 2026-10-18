@@ -10,9 +10,10 @@ import type { Lookup } from '@/data/lookup';
 import { useStore } from '@/data/store';
 
 /** Matches waiting for a court, in call order, with busy/resting info. */
-export function useQueue(lk: Lookup, t: Tournament, now: number) {
+export function useQueue(lk: Lookup, t: Tournament | undefined, now: number) {
   const entries = useStore((s) => s.entries);
   return useMemo(() => {
+    if (!t) return [];
     const map = new Map(entries.map((e) => [e.id, e]));
     return readyQueue(lk.matchesOf(t.id), map, (p) => lk.player(p)?.name ?? '', t.courts, now, t.restMinutes);
   }, [lk, t, entries, now]);

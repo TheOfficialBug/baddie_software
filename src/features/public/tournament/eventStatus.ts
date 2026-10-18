@@ -1,4 +1,4 @@
-import type { Match, TEvent } from '@/engine/types';
+import type { Match, SlotSource, TEvent } from '@/engine/types';
 
 import type { Lookup } from '@/data/lookup';
 
@@ -12,17 +12,18 @@ export function eventStatus(lk: Lookup, ev: TEvent, playerId: string): { text: s
     .sort((a, b) => a.number - b.number);
   const open = mine.find((m) => m.status === 'on_court' || m.status === 'ready');
   const last = [...mine].reverse().find((m) => m.status === 'finished');
-  const pending = lk
-    .matchesOfEvent(ev.id)
-    .some(
-      (m) =>
-        m.status === 'pending' &&
-        [m.srcA, m.srcB].some(
-          (s) =>
-            ((s.kind === 'winner' || s.kind === 'loser') && mine.some((x) => x.id === s.matchId && x.status === 'finished')) ||
-            s.kind === 'drop',
-        ),
-    );
+  const isMine = (e: Match['a']) => !!lk.entry(e)?.playerIds.includes(playerId);
+  // a match still waiting for this player: as winner or loser of their finished match, or on a drop line from their first match
+  const feedsMe = (s: SlotSource) => {
+    if (s.kind === 'drop') {
+      const from = lk.match(s.matchId);
+      return !!from && (isMine(from.a) || isMine(from.b));
+    }
+    if (s.kind !== 'winner' && s.kind !== 'loser') return false;
+    const from = mine.find((x) => x.id === s.matchId && x.status === 'finished' && x.winner);
+    return !!from && isMine(from[from.winner!]) === (s.kind === 'winner');
+  };
+  const pending = lk.matchesOfEvent(ev.id).some((m) => m.status === 'pending' && [m.srcA, m.srcB].some(feedsMe));
   const cur = open ?? last;
   const flight = cur ? lk.stage(cur.stageId)?.flight : undefined;
   if (!lk.stagesOf(ev.id).length) return { text: 'Draw not published yet' };
@@ -36,8 +37,8 @@ export function eventStatus(lk: Lookup, ev: TEvent, playerId: string): { text: s
   if (pending) return { text: 'Waiting for the next opponent', flight };
   if (!last) return { text: 'Waiting for the first match' };
   const iWon = last.winner && lk.entry(last[last.winner])?.playerIds.includes(playerId);
-  const st = lk.stage(last.stageId)!;
-  if (iWon && last.round === st.rounds && st.kind === 'knockout')
+  const st = lk.stage(last.stageId);
+  if (st && iWon && last.round === st.rounds && st.kind === 'knockout' && !st.placement)
     return { text: `Won the ${st.flight ? `${st.flight} flight` : st.name === 'Main draw' ? 'event' : st.name}`, flight };
   return { text: last.loserTo && !iWon ? `Dropped to the ${last.loserTo}` : 'Finished', flight };
 }
