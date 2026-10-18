@@ -73,8 +73,8 @@ describe('applyTsResults', () => {
             [21, 12],
           ],
     );
-    // Bea lost her first match: she is in the Plate now
-    const plate = rep.db.stages.find((s) => s.flight === 'B')!;
+    // Bea lost her first match: she drops to flight C (the site's Plate)
+    const plate = rep.db.stages.find((s) => s.flight === 'C')!;
     expect(rep.db.matches.some((m) => m.stageId === plate.id && [name(m.a as string), name(m.b as string)].includes('Bea'))).toBe(true);
   });
 

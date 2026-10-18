@@ -331,23 +331,24 @@ function specialPlate(eventId: ID, a2: Match[], a3: Match[]) {
   }
   const size = Math.max(2, nextPow2(lines.length));
   while (lines.length < size) lines.push({ kind: 'bye' });
-  const stage = makeStage(eventId, 'C', 'C flight', 2, size, 'C');
+  const stage = makeStage(eventId, 'B', 'B flight', 1, size, 'B');
   return { stage, matches: buildBracket(stage, lines) };
 }
 
 /**
- * tournamentsoftware "Triple Plate", sized and fed like the site: Plate (B) = first-match losers of A (one line per A
- * first-round match), Special Plate (C) = second-match losers of A (see specialPlate), Consolation Plate (D) =
- * first-match losers of B (one line per B first-round match). A bye in round 1 doesn't count as a match, so a player who had one and
- * loses in round 2 drops to the Plate, on their own line.
+ * tournamentsoftware "Triple Plate", sized and fed like the site, with A/B/C/D letters: B = second-match losers of A
+ * (the site's Special Plate, see specialPlate), C = first-match losers of A, one line per A first-round match (the
+ * site's Plate), D = first-match losers of C, one line per C first-round match (the site's Consolation Plate). A bye in
+ * round 1 doesn't count as a match, so a player who had one and loses in round 2 drops to C, on their own line.
  */
 function triplePlate(eventId: ID, aMatches: Match[]): { stages: Stage[]; matches: Match[]; warnings: string[] } {
   const byIndex = (ms: Match[]) => [...ms].sort((a, b) => a.index - b.index);
   const out = { stages: [] as Stage[], matches: [] as Match[], warnings: [] as string[] };
   const a1 = byIndex(roundOf(aMatches, 1));
-  const B = dropFeeder(eventId, 'B', 'B flight', 1, 'B', a1, 1);
-  const C = specialPlate(eventId, roundOf(aMatches, 2), roundOf(aMatches, 3));
-  const D = B ? dropFeeder(eventId, 'D', 'D flight', 3, 'D', byIndex(roundOf(B.matches, 1)), 1) : null;
+  // the site's Plate (first-match losers) is our C, its Special Plate (second-match losers, the stronger) our B
+  const C = dropFeeder(eventId, 'C', 'C flight', 2, 'C', a1, 1);
+  const B = specialPlate(eventId, roundOf(aMatches, 2), roundOf(aMatches, 3));
+  const D = C ? dropFeeder(eventId, 'D', 'D flight', 3, 'D', byIndex(roundOf(C.matches, 1)), 1) : null;
   for (const f of [B, C, D])
     if (f) {
       out.stages.push(f.stage);

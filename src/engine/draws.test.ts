@@ -765,16 +765,16 @@ describe('drop flight laid out like tournamentsoftware (Triple Plate)', () => {
   const stage = (f: string) => plan.stages.find((s) => s.flight === f)!;
   const a1 = roundIn(plan, stage('A').id, 1);
 
-  it('keeps all four flights at tournamentsoftware sizes: Main 64, Plate 32, Special Plate 32, Consolation Plate 16', () => {
+  it('keeps all four flights at tournamentsoftware sizes: A 64, B 32, C 32, D 16', () => {
     expect(plan.stages.map((s) => s.flight)).toEqual(['A', 'B', 'C', 'D']);
     expect(stageSizes(plan)).toEqual({ A: 64, B: 32, C: 32, D: 16 });
   });
 
-  it('Plate lines follow the first-round matches; Special Plate pairs round-2 and (mirrored) round-3 losers', () => {
-    const b = round1Lines(plan, stage('B').id);
+  it('C lines follow the first-round matches (site: Plate); B pairs round-2 and mirrored round-3 losers (site: Special Plate)', () => {
+    const b = round1Lines(plan, stage('C').id);
     a1.forEach((m, i) => expect(b[i]).toEqual({ kind: 'drop', matchId: m.id, nth: 1 }));
     // the site: Thomas Pate (lost round-3 match 2) on line 21 against Kunal Suresh (lost round-2 match 10) on line 22
-    const c = round1Lines(plan, stage('C').id);
+    const c = round1Lines(plan, stage('B').id);
     const r2m = roundIn(plan, stage('A').id, 2);
     const r3m = roundIn(plan, stage('A').id, 3);
     const M = r2m.length;
@@ -785,7 +785,7 @@ describe('drop flight laid out like tournamentsoftware (Triple Plate)', () => {
     });
     expect(c[20]).toEqual({ kind: 'loser', matchId: r3m[2].id, nth: 2 });
     expect(c[21]).toEqual({ kind: 'loser', matchId: r2m[10].id, nth: 2 });
-    const b1 = roundIn(plan, stage('B').id, 1);
+    const b1 = roundIn(plan, stage('C').id, 1);
     round1Lines(plan, stage('D').id).forEach((s, j) => expect(s).toEqual({ kind: 'drop', matchId: b1[j].id, nth: 1 }));
   });
 
@@ -822,47 +822,47 @@ describe('drop flight laid out like tournamentsoftware (Triple Plate)', () => {
       );
     };
     const r2 = () => roundIn({ ...plan, matches: ms }, stage('A').id, 2);
-    const bLines = () => roundIn({ ...plan, matches: ms }, stage('B').id, 1).flatMap((m) => [m.a, m.b]);
     const cLines = () => roundIn({ ...plan, matches: ms }, stage('C').id, 1).flatMap((m) => [m.a, m.b]);
+    const bLines = () => roundIn({ ...plan, matches: ms }, stage('B').id, 1).flatMap((m) => [m.a, m.b]);
 
     // A line pairs (round-1 matches): #1 e1 v bye · #2 e2 v bye · #3 e3 v e4 …
-    it('a round-1 loser drops to the Plate on their match’s line', () => {
+    it('a round-1 loser drops to C on their match’s line', () => {
       win(a1[2].id, 'e3');
-      expect(bLines()[2]).toBe('e4');
+      expect(cLines()[2]).toBe('e4');
     });
 
-    it('a player with a round-1 bye who loses in round 2 drops to the Plate too, on their own line (Kapelevich)', () => {
+    it('a player with a round-1 bye who loses in round 2 drops to C too, on their own line (Kapelevich)', () => {
       // round 2 match 1: e1 (bye) v e2 (bye) – both are playing their first match
       win(r2()[0].id, 'e1');
-      expect(bLines()[1]).toBe('e2');
-      expect(bLines()[0]).toBe('BYE'); // e1 won their first match: never drops here
+      expect(cLines()[1]).toBe('e2');
+      expect(cLines()[0]).toBe('BYE'); // e1 won their first match: never drops here
     });
 
-    it('a round-1 winner who loses in round 2 drops to the Special Plate (their second match)', () => {
+    it('a round-1 winner who loses in round 2 drops to B (their second match)', () => {
       // round 2 match 2: e3 (won round 1) v e5 (bye)
       const m = r2()[1];
       expect([m.a, m.b].sort()).toEqual(['e3', 'e5']);
       win(m.id, 'e5');
-      expect(cLines()[3]).toBe('e3'); // second match lost in round-2 match 1 → Special Plate match 1, second line
-      expect(bLines()).not.toContain('e3'); // never in the Plate: their first match was a win
+      expect(bLines()[3]).toBe('e3'); // second match lost in round-2 match 1 → Special Plate match 1, second line
+      expect(cLines()).not.toContain('e3'); // never in the Plate: their first match was a win
     });
 
-    it('a bye in round 1, a win in round 2 and a loss in round 3 is a second-match loss: Special Plate, mirrored (Thomas Pate)', () => {
+    it('a bye in round 1, a win in round 2 and a loss in round 3 is a second-match loss: B, mirrored (Thomas Pate)', () => {
       // e1 won round-2 match 0; round-3 match 0: e1 v e5 (winner of round-2 match 1)
       const r3 = ms.find((m) => m.stageId === stage('A').id && m.round === 3 && m.index === 0)!;
       expect([r3.a, r3.b].sort()).toEqual(['e1', 'e5']);
       win(r3.id, 'e5');
       // k = 0 → Special Plate match M - 2 - 0 = 14, first line
-      expect(cLines()[28]).toBe('e1');
+      expect(bLines()[28]).toBe('e1');
     });
 
-    it('a Plate player losing their first Plate match drops to the Consolation Plate', () => {
-      const b1 = roundIn({ ...plan, matches: ms }, stage('B').id, 1);
+    it('a C player losing their first C match drops to D', () => {
+      const b1 = roundIn({ ...plan, matches: ms }, stage('C').id, 1);
       const pair = b1.find((m) => m.a === 'e2' || m.b === 'e2')!;
       // e2 (line 2) v e1's line (a bye) → e2 goes through; their first Plate match is later. Give them one now:
       expect(pair.status).toBe('bye');
       const dLines = () => roundIn({ ...plan, matches: ms }, stage('D').id, 1).flatMap((m) => [m.a, m.b]);
-      const next = ms.find((m) => m.stageId === stage('B').id && m.round === 2 && (m.a === 'e2' || m.b === 'e2'))!;
+      const next = ms.find((m) => m.stageId === stage('C').id && m.round === 2 && (m.a === 'e2' || m.b === 'e2'))!;
       const other = next.a === 'e2' ? next.b : next.a;
       if (other && other !== 'BYE') {
         win(next.id, other);
