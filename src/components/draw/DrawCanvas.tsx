@@ -111,7 +111,8 @@ export function DrawCanvas({
     >
       {toolbar && <div className="shrink-0 border-b border-line">{toolbar}</div>}
       <div className="relative min-h-0 flex-1">
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface/95 p-0.5 shadow-sm backdrop-blur">
+        {/* phones: bottom right, in thumb reach and clear of the sticky round names along the top */}
+        <div className="absolute bottom-2 right-2 z-10 flex items-center gap-0.5 rounded-full border border-line bg-surface/95 p-0.5 shadow-sm backdrop-blur sm:bottom-auto sm:top-2">
           {controls}
           <button type="button" aria-label="Zoom out" onClick={() => zoomAt(zoom - 0.15)} className={zoomBtn}>
             <Icon name="minus" size={15} />
@@ -208,7 +209,7 @@ export function DrawCanvas({
             drag.current = null;
           }}
         >
-          <div ref={content} className="w-max select-none p-4 pt-12" style={{ zoom }}>
+          <div ref={content} className="w-max select-none p-4 pb-16 pt-12 sm:pb-4" style={{ zoom }}>
             {children}
           </div>
         </div>
