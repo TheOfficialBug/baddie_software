@@ -8,9 +8,11 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
+import { STORAGE_KEYS } from '@/config/app';
 import type { Player } from '@/engine/types';
 
 import { reportError } from '@/lib/monitoring';
+import { safeSessionStorage } from '@/lib/storage';
 import { getSupabase } from '@/lib/supabase';
 
 import { useStore } from '@/data/store';
@@ -142,26 +144,80 @@ const CLIENT_ID = Math.random().toString(36).slice(2, 12) + Date.now().toString(
 const PAGE = 1000;
 const POLL_MS = 15_000;
 const SAFETY_POLL_MS = 60_000;
+/**
+ * Catch-up reads again a few versions before the newest one seen: a write that took a version
+ * number first but committed after a later one is not skipped. Rows already seen are ignored.
+ */
+const OVERLAP = 50;
+const COLUMNS = 'coll,id,data,deleted,version,client_id';
+/** Unsaved changes are kept in the tab's session storage (per account), so a reload doesn't lose them. */
+const pendingKey = (user: string) => `${STORAGE_KEYS.pending}.${user}`;
+
+/** One unsaved change; `base` is the database version of the record the edit started from. */
+interface Pending extends Change {
+  base: number;
+}
 
 let client: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
+let channelSeq = 0;
 let lastSynced: Pick<DB, SyncedColl> | null = null;
 let applying = false;
 let maxVersion = 0;
 let privMaxVersion = 0;
+/** The newest database version this device has of each record ("coll:id"): loaded, received or written. */
+const versions = new Map<string, number>();
 /** Unsaved changes by "coll:id" (the newest wins). */
-const queue = new Map<string, Change>();
+const queue = new Map<string, Pending>();
+/** The account the queued changes belong to. */
+let queueOwner: string | null = null;
+/** This tab, and the tab that queued changes before a reload: rows they wrote are not someone else's. */
+const ownClients = new Set([CLIENT_ID]);
+/** Records another device changed while ours were on their way: read again once ours are saved. */
+const stale = new Set<string>();
+/** Check the queue against the database before sending it (after an outage or a reload). */
+let recheck = false;
 let flushing: Promise<void> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 2000;
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 let loadSeq = 0;
+let loadTimer: ReturnType<typeof setTimeout> | undefined;
+let loadDelay = 3000;
 /** Changes the database refused (counted so a caller can tell whether its own change went through). */
 let refusals = 0;
 
 const isStaff = () => useAuth.getState().access.memberships.length > 0;
 const syncedPart = (s: DB): Pick<DB, SyncedColl> => Object.fromEntries(COLLS.map((c) => [c, s[c]])) as Pick<DB, SyncedColl>;
+const rowKey = (r: { coll: string; id: string }) => `${r.coll}:${r.id}`;
 const setPending = () => useRemote.setState({ pending: queue.size });
+
+function persistQueue() {
+  if (!queueOwner) return;
+  if (queue.size)
+    safeSessionStorage.set(pendingKey(queueOwner), JSON.stringify({ clients: [...ownClients], changes: [...queue.values()] }));
+  else safeSessionStorage.remove(pendingKey(queueOwner));
+}
+
+/** The queue follows the signed-in account: another account's unsaved changes wait in storage for it. */
+function adoptQueue(user: string | null) {
+  if (user === queueOwner) return;
+  queue.clear();
+  stale.clear();
+  queueOwner = user;
+  if (user) {
+    try {
+      const kept = JSON.parse(safeSessionStorage.get(pendingKey(user)) ?? 'null') as { clients?: string[]; changes?: Pending[] } | null;
+      for (const c of kept?.changes ?? []) if (c && c.coll in SYNCED && typeof c.id === 'string') queue.set(rowKey(c), c);
+      for (const id of kept?.clients ?? []) ownClients.add(id);
+    } catch {
+      /* unreadable: nothing to restore */
+    }
+    // made before the reload: someone may have changed the same records since
+    if (queue.size) recheck = true;
+  }
+  setPending();
+}
 
 /** Replace store data without echoing it back to the database. */
 function applyToStore(patch: Partial<DB>) {
@@ -180,18 +236,50 @@ async function fetchAll(sb: SupabaseClient): Promise<{ rows: DbRow[]; max: numbe
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await sb
       .from('app_entities')
-      .select('coll,id,data,deleted,version,client_id')
+      .select(COLUMNS)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
     for (const r of data as DbRow[]) {
       max = Math.max(max, Number(r.version));
-      if (!r.deleted) rows.push(r);
+      rows.push(r);
     }
     if (data.length < PAGE) break;
   }
   return { rows, max };
+}
+
+/** The current database rows of some records ("coll:id"). */
+async function fetchKeys(sb: SupabaseClient, keys: string[]): Promise<DbRow[]> {
+  const byColl = new Map<string, string[]>();
+  for (const k of keys) {
+    const i = k.indexOf(':');
+    byColl.set(k.slice(0, i), [...(byColl.get(k.slice(0, i)) ?? []), k.slice(i + 1)]);
+  }
+  const out: DbRow[] = [];
+  for (const [coll, ids] of byColl) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await sb
+        .from('app_entities')
+        .select(COLUMNS)
+        .eq('coll', coll)
+        .in('id', ids.slice(i, i + 100));
+      if (error) throw error;
+      out.push(...(data as DbRow[]));
+    }
+  }
+  return out;
+}
+
+/** Read some records again and show what the database has. */
+async function refresh(keys: string[]) {
+  if (!client || !keys.length) return;
+  try {
+    receive(await fetchKeys(client, keys));
+  } catch (e) {
+    reportError(e, { source: 'remote.refresh' });
+  }
 }
 
 /** Contact details (staff, and each player for their own record). */
@@ -242,23 +330,51 @@ async function fetchTeam(sb: SupabaseClient) {
 export async function reload(): Promise<void> {
   const sb = client ?? (client = await getSupabase());
   const seq = ++loadSeq;
+  clearTimeout(loadTimer);
   if (useRemote.getState().status !== 'ready') useRemote.setState({ status: 'loading' });
   try {
     const { rows, max } = await fetchAll(sb);
     if (seq !== loadSeq) return;
-    maxVersion = max;
+    maxVersion = Math.max(maxVersion, max);
     privMaxVersion = 0;
+    // A record this device got (or wrote) while the load was under way is newer than what the load read.
+    const current = syncedPart(useStore.getState());
+    const local = (key: string): Row => {
+      const i = key.indexOf(':');
+      const coll = key.slice(0, i) as SyncedColl;
+      const id = key.slice(i + 1);
+      const data = (current[coll] as unknown[]).find((x) => keyOf(coll, x) === id) as Record<string, unknown> | undefined;
+      return data ? { coll, id, data } : { coll, id, data: {}, deleted: true };
+    };
+    const use: Row[] = [];
+    const read = new Set<string>();
+    for (const r of rows) {
+      if (!(r.coll in SYNCED)) continue;
+      const key = rowKey(r);
+      read.add(key);
+      if ((versions.get(key) ?? 0) > Number(r.version)) use.push(local(key));
+      else {
+        versions.set(key, Number(r.version));
+        if (!r.deleted) use.push(r);
+      }
+    }
+    for (const [key, v] of versions) if (v > max && !read.has(key)) use.push(local(key));
     const empty = Object.fromEntries(COLLS.map((c) => [c, []])) as unknown as Pick<DB, SyncedColl>;
     // keep changes that are still on their way to the database
-    let next = applyRows(empty, rows);
+    let next = applyRows(empty, use);
     next = applyRows(next, [...queue.values()]);
     applyToStore(next);
     await Promise.all([fetchPrivate(sb, 0), fetchTeam(sb)]);
+    loadDelay = 3000;
     useRemote.setState({ status: 'ready', error: undefined });
+    if (queue.size) void flush();
   } catch (e) {
     reportError(e, { source: 'remote.reload' });
-    if (useRemote.getState().status !== 'ready')
-      useRemote.setState({ status: 'error', error: 'Can’t reach the server. Check your connection and try again.' });
+    if (seq !== loadSeq || useRemote.getState().status === 'ready') return;
+    useRemote.setState({ status: 'error', error: 'Can’t reach the server. Check your connection and try again.' });
+    // the hall TV has nobody to press "Try again": keep trying
+    loadTimer = setTimeout(() => void reload(), loadDelay);
+    loadDelay = Math.min(loadDelay * 2, 30_000);
   }
 }
 
@@ -268,8 +384,8 @@ async function catchUp() {
   try {
     const { data, error } = await client
       .from('app_entities')
-      .select('coll,id,data,deleted,version,client_id')
-      .gt('version', maxVersion)
+      .select(COLUMNS)
+      .gt('version', Math.max(0, maxVersion - OVERLAP))
       .order('version')
       .limit(PAGE);
     if (error) throw error;
@@ -281,16 +397,33 @@ async function catchUp() {
   }
 }
 
-/** Rows from the database (realtime or catch-up). */
+/** Rows from the database (realtime, catch-up or a refresh). */
 function receive(rows: DbRow[]) {
   const fresh: Row[] = [];
+  const incomplete: string[] = [];
   for (const r of rows) {
     const v = Number(r.version);
     if (v > maxVersion) maxVersion = v;
-    // our own echo, or something we changed again since: the local copy is newer
-    if (r.client_id === CLIENT_ID || queue.has(`${r.coll}:${r.id}`)) continue;
+    if (!(r.coll in SYNCED)) continue;
+    const key = rowKey(r);
+    // already have this version or a newer one
+    if (v <= (versions.get(key) ?? 0)) continue;
+    // Realtime can leave out a large value that didn't change: read the record instead
+    if (!r.deleted && (!r.data || typeof r.data !== 'object')) {
+      incomplete.push(key);
+      continue;
+    }
+    // changed again here since: the local copy is newer for now, and is read again once it is saved
+    if (queue.has(key)) {
+      if (!ownClients.has(r.client_id ?? '')) stale.add(key);
+      continue;
+    }
+    versions.set(key, v);
+    // our own echo: the local copy is the same
+    if (r.client_id === CLIENT_ID) continue;
     fresh.push(r);
   }
+  if (incomplete.length) void refresh(incomplete);
   if (!fresh.length) return;
   const next = applyRows(syncedPart(useStore.getState()), fresh);
   applyToStore(next);
@@ -299,17 +432,20 @@ function receive(rows: DbRow[]) {
 function subscribe() {
   if (!client) return;
   if (channel) void client.removeChannel(channel);
-  channel = client
-    .channel(`app-${CLIENT_ID}`)
+  // a new topic each time: the client hands out a channel that is still leaving if the name is reused
+  const mine: RealtimeChannel = client
+    .channel(`app-${CLIENT_ID}-${++channelSeq}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities' }, (payload) => {
       if (payload.new && 'coll' in payload.new) receive([payload.new as DbRow]);
     })
     .subscribe((status) => {
+      if (channel !== mine) return; // an earlier subscription closing
       const live = status === 'SUBSCRIBED';
       useRemote.setState({ live });
       // anything missed while connecting or disconnected
       if (live) void catchUp();
     });
+  channel = mine;
 }
 
 function schedulePolling() {
@@ -329,8 +465,13 @@ function schedulePolling() {
 // ---------------------------------------------------------------------------
 // Writing
 // ---------------------------------------------------------------------------
-function enqueue(changes: Change[]) {
-  for (const c of changes) queue.set(`${c.coll}:${c.id}`, c);
+function enqueue(user: string, changes: Change[]) {
+  if (queueOwner !== user) adoptQueue(user);
+  for (const c of changes) {
+    const key = rowKey(c);
+    queue.set(key, { ...c, base: queue.get(key)?.base ?? versions.get(key) ?? 0 });
+  }
+  persistQueue();
   setPending();
   void flush();
 }
@@ -345,11 +486,16 @@ async function send(sb: SupabaseClient, batch: Change[]) {
   if (isStaff()) {
     for (let i = 0; i < batch.length; i += 200) {
       const part = batch.slice(i, i + 200);
-      const { error } = await sb.from('app_entities').upsert(
-        part.map((c) => ({ coll: c.coll, id: c.id, data: publicData(c), deleted: c.deleted, client_id: CLIENT_ID })),
-        { onConflict: 'coll,id' },
-      );
+      const { data, error } = await sb
+        .from('app_entities')
+        .upsert(
+          part.map((c) => ({ coll: c.coll, id: c.id, data: publicData(c), deleted: c.deleted, client_id: CLIENT_ID })),
+          { onConflict: 'coll,id' },
+        )
+        .select('coll,id,version');
       if (error) throw error;
+      for (const r of (data ?? []) as { coll: string; id: string; version: number }[])
+        versions.set(rowKey(r), Math.max(versions.get(rowKey(r)) ?? 0, Number(r.version)));
     }
     const priv = batch.filter((c) => c.coll === 'players' && !c.deleted && (c.data as Partial<Player>).email);
     if (priv.length) {
@@ -381,6 +527,31 @@ async function send(sb: SupabaseClient, batch: Change[]) {
   if (error) throw error;
 }
 
+/**
+ * Changes made offline (or before a reload) go out later than they were made: leave out those whose
+ * record someone else changed in the meantime, and show that version instead. Otherwise a phone
+ * coming back online would put an old live score over the result the desk has saved since.
+ */
+async function dropConflicts(sb: SupabaseClient, batch: Pending[]): Promise<Pending[]> {
+  const now = new Map((await fetchKeys(sb, batch.map(rowKey))).map((r) => [rowKey(r), r]));
+  const lost: DbRow[] = [];
+  for (const c of batch) {
+    const r = now.get(rowKey(c));
+    if (!r || Number(r.version) <= c.base || ownClients.has(r.client_id ?? '')) continue;
+    if (queue.get(rowKey(c)) === c) queue.delete(rowKey(c));
+    lost.push(r);
+  }
+  if (!lost.length) return batch;
+  persistQueue();
+  setPending();
+  receive(lost);
+  toast('Some changes were not saved', {
+    tone: 'error',
+    detail: `${lost.length} ${lost.length === 1 ? 'record was' : 'records were'} changed on another device while this one was offline. Check the latest scores.`,
+  });
+  return batch.filter((c) => queue.get(rowKey(c)) === c);
+}
+
 /** Refusals (permissions, validation) won't succeed on retry: show why and reload the real data. */
 const refused = (e: unknown) => {
   const err = e as { code?: string; message?: string };
@@ -400,35 +571,69 @@ const friendly = (e: unknown) => {
   return err?.message || 'The change was refused.';
 };
 
+/** Take saved (or refused) changes off the queue; anything changed again while sending stays. */
+function settle(batch: Pending[], ok: boolean) {
+  for (const c of batch) {
+    const key = rowKey(c);
+    const now = queue.get(key);
+    if (now === c) queue.delete(key);
+    // changed again while sending: that edit now builds on what was just written
+    else if (now && ok) now.base = versions.get(key) ?? now.base;
+  }
+  persistQueue();
+  setPending();
+  // another device wrote some of these meanwhile: show whichever write the database kept
+  const again = batch.map(rowKey).filter((k) => stale.has(k) && !queue.has(k));
+  for (const k of again) stale.delete(k);
+  if (again.length) void refresh(again);
+}
+
 async function flush(): Promise<void> {
   if (flushing || !queue.size) return flushing ?? undefined;
   const sb = client ?? (client = await getSupabase());
   flushing = (async () => {
+    // after a refusal, send one change at a time so the rest still goes through
+    let oneByOne = false;
+    let refusal: unknown = null;
+    let refusedCount = 0;
     while (queue.size) {
-      const batch = [...queue.values()];
+      let batch: Pending[] = oneByOne ? [queue.values().next().value as Pending] : [...queue.values()];
       try {
+        if (recheck && isStaff()) batch = await dropConflicts(sb, batch);
+        recheck = false;
+        if (!batch.length) continue;
         await send(sb, batch);
-        // keep anything changed again while sending
-        for (const c of batch) if (queue.get(`${c.coll}:${c.id}`) === c) queue.delete(`${c.coll}:${c.id}`);
+        settle(batch, true);
         retryDelay = 2000;
-        setPending();
       } catch (e) {
         if (refused(e)) {
+          if (batch.length > 1 && isStaff()) {
+            oneByOne = true;
+            continue;
+          }
           refusals++;
-          for (const c of batch) if (queue.get(`${c.coll}:${c.id}`) === c) queue.delete(`${c.coll}:${c.id}`);
-          setPending();
-          toast('Not saved', { tone: 'error', detail: friendly(e) });
+          refusedCount++;
+          refusal = e;
+          settle(batch, false);
           reportError(e, { source: 'remote.refused' });
-          void reload();
           continue;
         }
         reportError(e, { source: 'remote.flush' });
         if (retryDelay === 2000) toast('Offline: changes will be saved when the connection is back', { tone: 'info' });
+        // the changes now go out late: check them against the database first
+        recheck = true;
         clearTimeout(retryTimer);
         retryTimer = setTimeout(() => void flush(), retryDelay);
         retryDelay = Math.min(retryDelay * 2, 30_000);
         break;
       }
+    }
+    if (refusal) {
+      toast('Not saved', {
+        tone: 'error',
+        detail: refusedCount > 1 ? `${friendly(refusal)} (${refusedCount} changes)` : friendly(refusal),
+      });
+      void reload();
     }
   })().finally(() => {
     flushing = null;
@@ -482,20 +687,26 @@ export function startRemoteSync(): void {
     const next = syncedPart(state);
     const changes = diffDB(lastSynced, next);
     lastSynced = next;
-    if (changes.length && useAuth.getState().user) enqueue(changes);
+    const user = useAuth.getState().user;
+    if (changes.length && user) enqueue(user.id, changes);
   });
 
   // sign-in/out changes what this account may see
   let who: string | null | undefined;
   let roles = '';
+  const follow = (id: string | null, r: string) => {
+    who = id;
+    roles = r;
+    adoptQueue(id);
+    void reload().then(subscribe);
+  };
+  const rolesOf = (s: ReturnType<typeof useAuth.getState>) => s.access.memberships.map((m) => `${m.orgId}:${m.role}`).join(',');
   useAuth.subscribe((s) => {
     if (s.status === 'loading') return;
     const id = s.user?.id ?? null;
-    const r = s.access.memberships.map((m) => `${m.orgId}:${m.role}`).join(',');
+    const r = rolesOf(s);
     if (id === who && r === roles) return;
-    who = id;
-    roles = r;
-    void reload().then(subscribe);
+    follow(id, r);
   });
 
   window.addEventListener('beforeunload', (e) => {
@@ -505,18 +716,13 @@ export function startRemoteSync(): void {
     if (document.visibilityState === 'visible') void catchUp();
   });
   window.addEventListener('online', () => {
+    if (useRemote.getState().status === 'error') void reload();
     void flush();
     void catchUp();
   });
   schedulePolling();
 
   // first load as soon as auth knows who this is
-  if (useAuth.getState().status !== 'loading') {
-    who = useAuth.getState().user?.id ?? null;
-    roles = useAuth
-      .getState()
-      .access.memberships.map((m) => `${m.orgId}:${m.role}`)
-      .join(',');
-    void reload().then(subscribe);
-  }
+  const auth = useAuth.getState();
+  if (auth.status !== 'loading') follow(auth.user?.id ?? null, rolesOf(auth));
 }

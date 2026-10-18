@@ -620,3 +620,20 @@ describe('resolveMatches', () => {
     expect(ko.every((m) => m.status === 'pending' && m.a === null && m.b === null)).toBe(true);
   });
 });
+
+describe('numbers of byes that depend on a result', () => {
+  it('a match that becomes a bye through a result keeps its number (a corrected result can make it a real match again)', () => {
+    let seen = 0;
+    for (const N of range(5, 40)) {
+      const plan = draw('drop_flight', N, { variant: 'ABCD', layout: 'tournamentsoftware' });
+      const numbered = assignNumbers(resolveMatches(plan.matches, ctxOf(plan)), plan.stages, plan.groups, 1).matches;
+      const given = new Map(numbered.map((m) => [m.id, m.number]));
+      for (const m of simulate(plan, N, numbered)) {
+        if (m.status !== 'bye' || !given.get(m.id)) continue;
+        seen++;
+        expect(m.number, `N=${N} ${m.id}`).toBe(given.get(m.id));
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+});

@@ -38,7 +38,8 @@ export function resetMatch(db: DB, matchId: ID): OpResult {
   if (!played(m)) return { error: 'This match has no score to reset.' };
   const blocking = blockingDependents(m.id, db.matches);
   if (blocking.length) return { error: `Match #${blocking[0].number} already depends on this result. Reset that one first.` };
-  const t = tournamentOfEvent(db, m.eventId)!;
+  const t = tournamentOfEvent(db, m.eventId);
+  if (!t) return { error: 'Match not found.' };
   return { db: resolveTournament({ ...db, matches: db.matches.map((x) => (x.id === m.id ? unplayed(x) : x)) }, t.id) };
 }
 

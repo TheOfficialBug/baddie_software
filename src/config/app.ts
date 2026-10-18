@@ -13,4 +13,6 @@ export const STORAGE_KEYS = {
   demoSession: 'smashboard.demo.session',
   adminSidebar: 'smashboard.adminSidebar',
   demoAccounts: 'smashboard.demo.accounts',
+  /** live mode: changes not yet saved to the database, per account (session storage: survives a reload of the tab) */
+  pending: 'smashboard.pending',
 } as const;

@@ -27,6 +27,17 @@ describe('fill free courts', () => {
     expect(db.notices.length).toBe(before.notices.length + called.length);
   });
 
+  it('never calls a match of a withdrawn entry (the desk enters the walkover)', () => {
+    const before = drawn();
+    const first = fillFreeCourts(before, IOWA_OPEN_ID, NOW).called;
+    const out = before.matches.find((m) => m.id === first[0].matchId)!.a;
+    const withdrawn = { ...before, entries: before.entries.map((e) => (e.id === out ? { ...e, status: 'withdrawn' as const } : e)) };
+    const { db, called } = fillFreeCourts(withdrawn, IOWA_OPEN_ID, NOW);
+    expect(called.length).toBeGreaterThan(0);
+    for (const c of called)
+      expect([db.matches.find((m) => m.id === c.matchId)!.a, db.matches.find((m) => m.id === c.matchId)!.b]).not.toContain(out);
+  });
+
   it('does nothing when every court is busy', () => {
     const once = fillFreeCourts(drawn(), IOWA_OPEN_ID, NOW).db;
     expect(fillFreeCourts(once, IOWA_OPEN_ID, NOW + 60_000).called).toEqual([]);

@@ -51,7 +51,8 @@ export function EventDraw({
     return m;
   }, [matches]);
 
-  if (!stages.length)
+  // (a round robin's group stage can be gone for a moment while its draw is redone)
+  if (!stages.length || (ev.mode === 'round_robin' && !stages.some((s) => s.kind === 'group')))
     return (
       <Empty
         icon="draws"

@@ -56,7 +56,7 @@ export function EventPage() {
             .entriesOf(ev.id)
             .filter((e) => e.status === 'accepted')
             .flatMap((e) => e.playerIds)
-            .map((id) => lk.player(id)!)
+            .flatMap((id) => lk.player(id) ?? [])
             .sort((a, b) => a.name.localeCompare(b.name))
         : [],
     [ev, lk],

@@ -72,7 +72,11 @@ export const routes: RouteObject[] = [
           },
         ],
       },
-      { path: 't/:slug/tv', lazy: () => import('@/features/public/tv/TVMode').then((m) => ({ Component: m.TVMode })) },
+      {
+        path: 't/:slug/tv',
+        errorElement: <RouteError />,
+        lazy: () => import('@/features/public/tv/TVMode').then((m) => ({ Component: m.TVMode })),
+      },
       {
         path: 'admin',
         element: <RequireOrganizer />,

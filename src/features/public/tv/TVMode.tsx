@@ -31,7 +31,7 @@ export function TVMode() {
   useDocumentTitle('TV', t?.name);
   const now = useNow(5000);
   const pref = useThemePref();
-  const queue = useQueue(lk, t ?? lk.tournaments[0], now);
+  const queue = useQueue(lk, t, now);
 
   useEffect(() => {
     if (pref !== 'system') return;

@@ -43,7 +43,10 @@ Most of the 1,800+ tests live here. Randomness always comes from a seeded RNG (`
   (`supabase/migrations/20261017120000_app_entities.sql`). On start and on sign-in/out it loads what the account may
   see; after every store change it diffs the snapshot and writes the changed records (staff directly, players through
   the `app_submit` RPC); Realtime pushes other devices' changes in, with a catch-up query by `version` after a
-  dropped connection. Screens are unchanged: they still read through `useLookup()` and `useStore` selectors.
+  dropped connection. Unsaved changes wait in the tab's session storage (per account), so a reload doesn't lose them;
+  changes that go out late (after an outage or a reload) are first checked against the database, and records another
+  device changed in the meantime are not overwritten. Tests: `remoteSync.test.ts` against an in-memory Supabase
+  (`src/test/fakeSupabase.ts`). Screens are unchanged: they still read through `useLookup()` and `useStore` selectors.
   Without Supabase settings the store keeps its data in `localStorage` (demo mode) and `sync.ts` mirrors other tabs.
 
 The normalized tables from the first migration (with `call_match` / `record_result`) remain the long-term target;

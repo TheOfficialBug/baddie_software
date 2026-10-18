@@ -172,3 +172,65 @@ describe('notices and seeds', () => {
     expect(seeds.slice(ev.config.seeds).every((s) => s === undefined)).toBe(true);
   });
 });
+
+describe('corrections that would change a match already under way', () => {
+  const patch = (d: DB, id: string, p: Partial<Match>): DB => ({ ...d, matches: d.matches.map((x) => (x.id === id ? { ...x, ...p } : x)) });
+  /** An on-court match whose winner goes on to another match. */
+  const feeding = () =>
+    matchesOfLive().find(
+      (x) => x.status === 'on_court' && db.matches.some((n) => [n.srcA, n.srcB].some((s) => s.kind === 'winner' && s.matchId === x.id)),
+    )!;
+  const nextOf = (d: DB, id: string) => d.matches.find((n) => [n.srcA, n.srcB].some((s) => s.kind === 'winner' && s.matchId === id))!;
+
+  it('undo of an edited result is refused once the next match has started', () => {
+    const m = feeding();
+    const saved = ops.saveResult(db, m.id, { games: winningGames(m, 'a'), result: 'normal' }, NOW).db!;
+    const edit: MatchUpdate = { id: 'u2', matchId: m.id, at: NOW, label: 'Result edited', before: ops.snapshot(get(saved, m.id)) };
+    const edited = ops.saveResult(saved, m.id, { games: winningGames(m, 'b'), result: 'normal' }, NOW).db!;
+    const started = patch(edited, nextOf(edited, m.id).id, { status: 'on_court', courtId: 'elsewhere', calledAt: NOW });
+    const r = ops.restore(started, edit);
+    expect(r.db).toBeUndefined();
+    expect(r.error).toMatch(/already started/);
+  });
+
+  it('undo of an edit with the same winner still goes through', () => {
+    const m = feeding();
+    const saved = ops.saveResult(db, m.id, { games: winningGames(m, 'a'), result: 'normal' }, NOW).db!;
+    const edit: MatchUpdate = { id: 'u2', matchId: m.id, at: NOW, label: 'Result edited', before: ops.snapshot(get(saved, m.id)) };
+    const games = winningGames(m, 'a').map(([x, y]) => [x, y - 1] as GameScore);
+    const edited = ops.saveResult(saved, m.id, { games, result: 'normal' }, NOW).db!;
+    const started = patch(edited, nextOf(edited, m.id).id, { status: 'on_court', courtId: 'elsewhere', calledAt: NOW });
+    expect(ops.restore(started, edit).error).toBeUndefined();
+  });
+
+  it('undo of a saved result is refused while another match is on its court', () => {
+    const m = matchesOfLive().find((x) => x.status === 'on_court')!;
+    const u: MatchUpdate = { id: 'u1', matchId: m.id, at: NOW, label: 'Result saved', before: ops.snapshot(m) };
+    const saved = ops.saveResult(db, m.id, { games: winningGames(m, 'a'), result: 'normal' }, NOW).db!;
+    const other = saved.matches.find((x) => x.status === 'ready' && x.eventId === m.eventId)!;
+    const r = ops.restore(patch(saved, other.id, { status: 'on_court', courtId: m.courtId, calledAt: NOW }), u);
+    expect(r.db).toBeUndefined();
+    expect(r.error).toMatch(new RegExp(`#${other.number}`));
+  });
+
+  it('a group result with the same winner but other scores is refused once the knockout it feeds has started', () => {
+    const m = db.matches.find(
+      (x) =>
+        x.status === 'finished' &&
+        x.groupId &&
+        x.result === 'normal' &&
+        db.matches.some((k) => [k.srcA, k.srcB].some((s) => s.kind === 'group' && s.groupId === x.groupId)),
+    )!;
+    expect(m).toBeDefined();
+    const ko = db.matches.find((k) => [k.srcA, k.srcB].some((s) => s.kind === 'group' && s.groupId === m.groupId))!;
+    const started = patch(db, ko.id, { status: 'on_court', courtId: 'elsewhere', calledAt: NOW, a: ko.a ?? m.a, b: ko.b ?? m.b });
+    const games = winningGames(m, m.winner!).map(([x, y]) => (m.winner === 'a' ? [x, 0] : [0, y]) as GameScore);
+    const r = ops.saveResult(started, m.id, { games, result: 'normal' }, NOW);
+    expect(r.error).toMatch(/already started/);
+  });
+
+  it('returning a match to the queue does nothing once its result is in (a stale tap)', () => {
+    const m = matchesOfLive().find((x) => x.status === 'finished')!;
+    expect(get(ops.returnToQueue(db, m.id), m.id)).toEqual(m);
+  });
+});

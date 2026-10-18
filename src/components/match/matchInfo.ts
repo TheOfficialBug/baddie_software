@@ -6,18 +6,21 @@ import type { Lookup } from '@/data/lookup';
 
 export function matchContext(lk: Lookup, m: Match) {
   const ev = lk.event(m.eventId)!;
-  const st = lk.stage(m.stageId)!;
+  // live data arrives record by record: the stage of a draw being redone can be gone before its matches
+  const st = lk.stage(m.stageId);
   const group = lk.group(m.groupId);
-  const round = group ? group.name : roundName(st, m.round);
-  const short = group ? group.name.replace('Group ', 'Grp ') : roundName(st, m.round, true);
-  const stageLabel = st.flight
-    ? `${st.flight} flight`
-    : st.kind === 'group'
-      ? ''
-      : st.name === 'Main draw' || st.name === 'Knockout'
+  const round = group ? group.name : st ? roundName(st, m.round) : '';
+  const short = group ? group.name.replace('Group ', 'Grp ') : st ? roundName(st, m.round, true) : '';
+  const stageLabel = !st
+    ? ''
+    : st.flight
+      ? `${st.flight} flight`
+      : st.kind === 'group'
         ? ''
-        : st.name;
-  return { ev, st, group, round, short, stageLabel, flight: st.flight, label: [stageLabel, round].filter(Boolean).join(' · ') };
+        : st.name === 'Main draw' || st.name === 'Knockout'
+          ? ''
+          : st.name;
+  return { ev, st, group, round, short, stageLabel, flight: st?.flight, label: [stageLabel, round].filter(Boolean).join(' · ') };
 }
 
 /** Text for a slot whose player isn't known yet, e.g. "Winner of #12". */
