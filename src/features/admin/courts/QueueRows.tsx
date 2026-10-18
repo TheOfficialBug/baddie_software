@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 
 import type { QueueItem } from '@/engine/scheduler';
 import type { Match, Tournament } from '@/engine/types';
 
 import { fmtAgo } from '@/lib/format';
 
-import { type Lookup } from '@/data/lookup';
+import { type Lookup, sameButMatches } from '@/data/lookup';
 import { useCheckInMarks } from '@/data/queries';
 import { useStore } from '@/data/store';
 
@@ -45,21 +45,29 @@ export function MiniRow({ lk, m, sub, right }: { lk: Lookup; m: Match; sub?: str
   );
 }
 
-export function QueueRow({
-  lk,
-  t,
-  q,
-  canCall,
-  onCall,
-  onDrag,
-}: {
+interface QueueRowProps {
   lk: Lookup;
   t: Tournament;
   q: QueueItem;
   canCall: boolean;
+  /** Calls this row's match (a new closure each render, over the same match). */
   onCall: () => void;
   onDrag: (id: string | null) => void;
-}) {
+}
+
+// The queue re-renders on every live point at the desk; a row only when its match, its state or the
+// people and events it names change. onCall is left out: it calls the same match.
+const sameRow = (a: QueueRowProps, b: QueueRowProps) =>
+  a.q.match === b.q.match &&
+  a.q.blocked === b.q.blocked &&
+  a.q.resting?.name === b.q.resting?.name &&
+  a.q.resting?.minutesLeft === b.q.resting?.minutesLeft &&
+  a.t === b.t &&
+  a.canCall === b.canCall &&
+  a.onDrag === b.onDrag &&
+  sameButMatches(a.lk, b.lk);
+
+export const QueueRow = memo(function QueueRow({ lk, t, q, canCall, onCall, onDrag }: QueueRowProps) {
   const { openScore } = useAdmin();
   const m = q.match;
   const c = matchContext(lk, m);
@@ -112,7 +120,7 @@ export function QueueRow({
       <span className="sr-only">{t.name}</span>
     </div>
   );
-}
+}, sameRow);
 
 export function RecentRow({ lk, m, now }: { lk: Lookup; m: Match; now: number }) {
   const { openScore } = useAdmin();

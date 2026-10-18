@@ -39,9 +39,24 @@ export interface Lookup {
   entryLevel: (id: ID) => number;
   entriesOfPlayer: (pid: ID, tid?: ID) => Entry[];
   courtName: (tid: ID, courtId?: ID) => string;
+  /** The collections this lookup reads (to tell what changed between two lookups, see sameButMatches). */
+  src: LookupSource;
 }
 
 type LookupSource = Pick<DB, 'tournaments' | 'players' | 'entries' | 'events' | 'stages' | 'groups' | 'matches'>;
+
+/**
+ * Two lookups read the same data except, perhaps, the matches. A component that shows one match (and no
+ * other match through the lookup) can skip re-rendering on a live point elsewhere when this holds.
+ */
+export const sameButMatches = (a: Lookup, b: Lookup): boolean =>
+  a === b ||
+  (a.src.tournaments === b.src.tournaments &&
+    a.src.players === b.src.players &&
+    a.src.entries === b.src.entries &&
+    a.src.events === b.src.events &&
+    a.src.stages === b.src.stages &&
+    a.src.groups === b.src.groups);
 
 // Indexes are cached per collection array: the store replaces an array only when it changes, so a live point
 // (a new matches array) rebuilds the match indexes and reuses those of players, entries and events.
@@ -144,6 +159,7 @@ export function makeLookup(s: LookupSource): Lookup {
     entriesOfPlayer: (pid, tid) =>
       s.entries.filter((e) => e.playerIds.includes(pid) && e.status !== 'withdrawn' && (!tid || EV.get(e.eventId)?.tournamentId === tid)),
     courtName: (tid, courtId) => T.get(tid)?.courts.find((c) => c.id === courtId)?.name ?? 'Court',
+    src: s,
   };
   return lk;
 }
