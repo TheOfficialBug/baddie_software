@@ -42,7 +42,7 @@ export function Segmented<T extends string>({
             disabled={o.disabled}
             onClick={() => onChange(o.value)}
             className={cn(
-              'inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full font-semibold transition-colors disabled:opacity-40',
+              'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors disabled:opacity-40',
               size === 'sm' ? 'min-h-9 px-3 text-[12.5px] touch:min-h-10' : 'min-h-10 px-4 text-[13.5px] touch:min-h-11',
               on ? 'bg-surface text-fg shadow-lift' : 'text-muted hover:text-fg',
               stretch && 'flex-1',

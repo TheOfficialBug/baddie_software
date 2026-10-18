@@ -196,7 +196,7 @@ export function LoginPage() {
         {mode === 'signin' && (
           <Link
             to={`/forgot-password${email ? `?email=${encodeURIComponent(email.trim())}` : ''}`}
-            className="-mt-1 self-end text-[13.5px] font-semibold text-muted hover:text-fg"
+            className="tap-target -mt-1 self-end rounded-md text-[13.5px] font-semibold text-muted hover:text-fg"
           >
             Forgot password?
           </Link>
