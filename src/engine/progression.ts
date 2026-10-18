@@ -57,7 +57,15 @@ export function resolveMatches(matches: Match[], ctx: ResolveContext): Match[] {
         // how many real matches the loser had played in this flight, this one included
         let n = 1;
         for (const x of byId.values())
-          if (x.stageId === m.stageId && x.round < m.round && x.status === 'finished' && x.a !== 'BYE' && x.b !== 'BYE' && (x.a === l || x.b === l)) n++;
+          if (
+            x.stageId === m.stageId &&
+            x.round < m.round &&
+            x.status === 'finished' &&
+            x.a !== 'BYE' &&
+            x.b !== 'BYE' &&
+            (x.a === l || x.b === l)
+          )
+            n++;
         return n === s.nth ? l : 'BYE';
       }
       case 'drop':

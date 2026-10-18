@@ -7,7 +7,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-artifact', 'coverage', 'node_modules'] },
+  // local/: machine-only tooling and real tournament files (git-ignored)
+  { ignores: ['dist', 'dist-artifact', 'coverage', 'node_modules', 'local'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended, jsxA11y.flatConfigs.recommended],

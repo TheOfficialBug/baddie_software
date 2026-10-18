@@ -148,7 +148,7 @@ export function buildScenario(file: TsDrawFile, now = Date.now(), seed = 26): DB
       ...db.notices,
       announce(
         'Welcome to the Iowa Open 2026',
-        'Every event is an A/B/C/D drop flight: lose in A and you drop to the Plate (B), Special Plate (C) or Consolation Plate (D). Follow every court live here.',
+        'Every event is an A/B/C/D drop flight: lose your first match and you drop to flight B, your second and you drop to C; lose your first match in B and you drop to D. Follow every court live here.',
         now - 7 * 60 * 60_000,
       ),
       announce('Semi-finals are done', 'Finals are on court now. Come watch on courts 1 to 6!', now - 5 * 60_000),
