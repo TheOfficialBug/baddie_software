@@ -71,7 +71,7 @@ export function ChampionsPanel() {
         </span>
         <h2 className="font-display text-[clamp(22px,3vw,30px)] font-extrabold">Champions</h2>
       </div>
-      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ ev, c }) => (
           <div key={`${ev.id}-${c.label}`} className="flex min-w-0 flex-col gap-1 rounded-2xl bg-hero-line/[0.07] p-4">
             <span className="text-[12px] font-semibold uppercase tracking-wider text-hero-muted">

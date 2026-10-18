@@ -43,7 +43,7 @@ export function Stepper({
           const n = Number(e.target.value.replace(/\D/g, ''));
           if (!Number.isNaN(n)) onChange(clamp(n));
         }}
-        className="num w-12 bg-transparent text-center text-[17px] font-semibold outline-none"
+        className="input-big num w-12 bg-transparent text-center text-[17px] font-semibold outline-none"
       />
       {suffix && <span className="-ml-1 pr-1 text-[13px] text-muted">{suffix}</span>}
       <button

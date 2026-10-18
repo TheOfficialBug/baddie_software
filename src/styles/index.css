@@ -167,9 +167,10 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
-  /* 16px inputs on phones stop iOS from zooming the page on focus */
+  /* 16px inputs on phones stop iOS from zooming the page on focus.
+     Inputs already set larger (score boxes, steppers) opt out with .input-big so they keep their size. */
   @media (max-width: 639px) {
-    input,
+    input:not(.input-big),
     select,
     textarea {
       font-size: 16px !important;
@@ -183,6 +184,12 @@
   html {
     /* anchors and focused fields stop below the sticky top bar */
     scroll-padding-top: 80px;
+  }
+  /* …and above the bottom bar on phones and tablets */
+  @media (max-width: 1023px) {
+    html {
+      scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+    }
   }
   :focus-visible {
     outline: 2px solid rgb(var(--accent));
@@ -328,6 +335,15 @@
   }
   @media (min-width: 768px) {
     .pb-safe-bar {
+      padding-bottom: 56px;
+    }
+  }
+  /* The organizer desk keeps its bottom bar on tablets too */
+  .pb-safe-bar-lg {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  }
+  @media (min-width: 1024px) {
+    .pb-safe-bar-lg {
       padding-bottom: 56px;
     }
   }

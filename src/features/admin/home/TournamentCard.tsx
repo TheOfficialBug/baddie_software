@@ -57,7 +57,7 @@ export function TournamentCard({ lk, t }: { lk: Lookup; t: Tournament }) {
         </p>
       </div>
 
-      <dl className="grid grid-cols-2 gap-2 xs:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map(({ k, v, warn }) => (
           <div key={k} className="min-w-0 rounded-xl bg-sunken px-3 py-2.5">
             <dt className="truncate text-[12px] font-semibold text-muted">{k}</dt>

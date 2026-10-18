@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useMatch, useMatches, useNavigate } from 'react-router';
+import { Link, matchPath, NavLink, Outlet, useLocation, useMatch, useMatches, useNavigate } from 'react-router';
 
 import { APP_NAME, STORAGE_KEYS } from '@/config/app';
 
@@ -19,7 +19,9 @@ import { ScoreDialog } from '@/components/match/ScoreEntry';
 import { LiveDot } from '@/components/tournament/Badges';
 import { Avatar } from '@/components/ui/Avatar';
 import { BackButton } from '@/components/ui/BackButton';
-import { ButtonLink, IconButton } from '@/components/ui/Button';
+import { BottomBar } from '@/components/ui/BottomBar';
+import { Button, ButtonLink, IconButton } from '@/components/ui/Button';
+import { Dialog } from '@/components/ui/Dialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Logo, ShuttleMark } from '@/components/ui/Logo';
 import { isHomePath } from '@/components/ui/parentPath';
@@ -45,12 +47,15 @@ export function AdminShell() {
   const checkIns = useCheckIns(t?.id);
   const needed = (useMatches().at(-1)?.handle as RouteHandle | undefined)?.cap;
   const [scoreFor, setScoreFor] = useState<string | null>(null);
-  const [drawer, setDrawer] = useState(false);
+  // phones and tablets: the sections that don't fit the bottom bar, in a sheet
+  const [more, setMore] = useState(false);
   const [palette, setPalette] = useState(false);
   // Desktop sidebar: full, or a narrow icon rail. Remembered on this device.
   const [collapsed, setCollapsed] = useState(() => safeStorage.get(STORAGE_KEYS.adminSidebar) === 'collapsed');
   const nav = useNavigate();
   const { pathname } = useLocation();
+  // the sheet closes once a link in it has been followed (or the page changes some other way)
+  useEffect(() => setMore(false), [pathname]);
   const ctx = useMemo(() => ({ openScore: setScoreFor, openSearch: () => setPalette(true) }), []);
 
   const toggleCollapsed = useCallback(
@@ -72,7 +77,6 @@ export function AdminShell() {
         e.preventDefault();
         toggleCollapsed();
       }
-      if (e.key === 'Escape') setDrawer(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -141,7 +145,6 @@ export function AdminShell() {
       key={it.to}
       to={it.to}
       end={it.end}
-      onClick={() => setDrawer(false)}
       title={rail ? it.label : undefined}
       aria-label={rail ? it.label : undefined}
       className={({ isActive }) =>
@@ -189,7 +192,6 @@ export function AdminShell() {
             value={t.id}
             onChange={(e) => {
               nav(`/admin/t/${e.target.value}`);
-              setDrawer(false);
             }}
           >
             {mine.map((x) => (
@@ -247,16 +249,129 @@ export function AdminShell() {
     </div>
   );
 
-  const bottom: NavItem[] = t
-    ? (
-        [
-          { to: `/admin/t/${t.id}`, label: 'Run', icon: 'dashboard', end: true, live: onCourt > 0 },
-          { to: `/admin/t/${t.id}/entries`, label: 'Entries', icon: 'userAdd', cap: 'manage_entries' },
-          { to: `/admin/t/${t.id}/draws`, label: 'Draws', icon: 'draws', cap: 'manage_draws' },
-          { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
-        ] satisfies NavItem[]
-      ).filter(allowed)
-    : [];
+  // Phones and tablets: four destinations in the bottom bar (a scorer's fill up with match-day pages),
+  // everything else in the More sheet.
+  const bottom: NavItem[] =
+    t && role
+      ? (
+          [
+            { to: `/admin/t/${t.id}`, label: 'Run', icon: 'dashboard', end: true, live: onCourt > 0 },
+            { to: `/admin/t/${t.id}/entries`, label: 'Entries', icon: 'userAdd', cap: 'manage_entries' },
+            { to: `/admin/t/${t.id}/draws`, label: 'Draws', icon: 'draws', cap: 'manage_draws' },
+            { to: `/admin/t/${t.id}/players`, label: 'Players', icon: 'users' },
+            { to: `/admin/t/${t.id}/notify`, label: 'Messages', icon: 'megaphone' },
+            { to: `/admin/t/${t.id}/scores`, label: 'Results', icon: 'whistle' },
+          ] satisfies NavItem[]
+        )
+          .filter(allowed)
+          .slice(0, 4)
+      : [
+          { to: '/admin', label: 'Tournaments', icon: 'trophy', end: true },
+          { to: '/admin/team', label: 'Team', icon: 'users' },
+        ];
+  const inBar = (to: string) => bottom.some((b) => b.to === to);
+  const sheetItems = groups.flatMap((g) => g.items).filter((it) => !inBar(it.to));
+  const onBarPage = bottom.some((b) => matchPath({ path: b.to, end: !!b.end }, pathname));
+
+  // The More sheet: the other sections as big tiles, then the tournament switcher, account and theme.
+  const tile = (it: NavItem) => (
+    <NavLink
+      key={it.to}
+      to={it.to}
+      end={it.end}
+      onClick={() => setMore(false)}
+      className={({ isActive }) =>
+        cn(
+          'relative flex min-h-[76px] flex-col items-start justify-between gap-2 rounded-2xl border p-3 text-[13.5px] font-semibold leading-tight transition-colors',
+          isActive ? 'border-primary bg-primary/10 text-fg' : 'border-line bg-bg text-fg hover:border-fg/40',
+        )
+      }
+    >
+      <Icon name={it.icon} size={21} className="text-muted" />
+      <span>{it.label}</span>
+      {it.badge !== undefined && (
+        <span className="num absolute right-2.5 top-2.5 rounded-full bg-sunken px-2 text-[11.5px] font-semibold text-muted">
+          {it.badge}
+        </span>
+      )}
+    </NavLink>
+  );
+  const row = (to: string, label: string, icon: IconName) => (
+    <NavLink
+      to={to}
+      end
+      onClick={() => setMore(false)}
+      className={({ isActive }) =>
+        cn(
+          'flex min-h-12 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition-colors',
+          isActive ? 'bg-sunken text-fg' : 'text-fg hover:bg-sunken',
+        )
+      }
+    >
+      <Icon name={icon} size={19} className="text-muted" />
+      <span className="flex-1">{label}</span>
+      <Icon name="right" size={16} className="text-faint" />
+    </NavLink>
+  );
+  const moreSheet = (
+    <Dialog
+      open={more}
+      onClose={() => setMore(false)}
+      title={t && role ? t.name : 'Organizer desk'}
+      subtitle={role ? `Your role: ${ROLE_LABEL[role]}` : access.user?.email}
+      size="sm"
+      className="lg:hidden"
+    >
+      <div className="flex flex-col gap-5">
+        {sheetItems.length > 0 && (
+          <nav aria-label="More sections" className="grid grid-cols-2 gap-2 2xs:grid-cols-3">
+            {sheetItems.map(tile)}
+          </nav>
+        )}
+        {t && role && mine.length > 1 && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="admin-tournament-sheet" className="eyebrow">
+              Switch tournament
+            </label>
+            <Select
+              id="admin-tournament-sheet"
+              className="font-semibold"
+              value={t.id}
+              onChange={(e) => {
+                setMore(false);
+                nav(`/admin/t/${e.target.value}`);
+              }}
+            >
+              {mine.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+        <div className="-mx-3 flex flex-col">
+          {t && row(`/t/${t.slug}`, 'View public page', 'external')}
+          {t && role && row('/admin', 'All tournaments', 'trophy')}
+          {row('/account', 'Account settings', 'settings')}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="eyebrow">Theme</div>
+          <ThemeToggle labels className="w-full" />
+        </div>
+        <div className="flex items-center gap-3 border-t border-line pt-4">
+          <Avatar name={access.user?.name ?? '?'} size={36} />
+          <span className="flex min-w-0 flex-1 flex-col text-[13px] leading-tight">
+            <strong className="truncate">{access.user?.name}</strong>
+            <span className="truncate text-muted">{access.user?.email}</span>
+          </span>
+          <Button variant="ghost" size="sm" icon={<Icon name="logout" size={17} />} className="touch:min-h-11" onClick={signOut}>
+            Sign out
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
 
   // Access for the page being shown: staff of this tournament's organization, with the page's capability.
   let page = <Outlet />;
@@ -298,32 +413,9 @@ export function AdminShell() {
         >
           {sidebar(collapsed)}
         </aside>
-        {drawer && (
-          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-            <button
-              type="button"
-              tabIndex={-1}
-              aria-label="Close menu"
-              className="absolute inset-0 cursor-default bg-[rgb(var(--shadow)/0.5)]"
-              onClick={() => setDrawer(false)}
-            />
-            <aside
-              className="absolute inset-y-0 left-0 w-[300px] max-w-[88vw] animate-rise border-r border-line bg-bg"
-              style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-            >
-              <IconButton label="Close menu" className="absolute right-3 top-4 z-10" onClick={() => setDrawer(false)}>
-                <Icon name="close" size={20} />
-              </IconButton>
-              {sidebar(false)}
-            </aside>
-          </div>
-        )}
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky z-30 border-b border-line bg-bg/90 backdrop-blur-md" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
             <div className="flex h-16 items-center gap-2 px-3 sm:px-5 lg:px-8">
-              <IconButton label="Open menu" className="lg:hidden" onClick={() => setDrawer(true)}>
-                <Icon name="menu" size={22} />
-              </IconButton>
               {!isHomePath(pathname) && <BackButton />}
               <IconButton
                 label={collapsed ? 'Expand sidebar (Ctrl+\\)' : 'Collapse sidebar (Ctrl+\\)'}
@@ -333,14 +425,14 @@ export function AdminShell() {
               >
                 <Icon name={collapsed ? 'expand' : 'collapse'} size={20} />
               </IconButton>
-              {/* the mark never shrinks; the name shows once there's room (≥380px) */}
+              {/* the mark never shrinks; the name shows once there's room (≥350px) */}
               <Link
                 to="/admin"
-                className="flex min-w-0 shrink-0 items-center gap-2 xs:shrink lg:hidden"
+                className="flex min-w-0 shrink-0 items-center gap-2 2xs:shrink lg:hidden"
                 aria-label={`${APP_NAME} organizer home`}
               >
                 <ShuttleMark size={30} className="shrink-0" />
-                <span className="hidden truncate font-display text-[17px] font-extrabold xs:inline">{t?.name ?? APP_NAME}</span>
+                <span className="hidden truncate font-display text-[17px] font-extrabold 2xs:inline">{t?.name ?? APP_NAME}</span>
               </Link>
               {t && role && (
                 <button
@@ -362,48 +454,16 @@ export function AdminShell() {
               </div>
             </div>
           </header>
-          <main className="pb-safe-bar mx-auto w-full max-w-[1320px] flex-1 px-4 pt-4 sm:px-5 lg:px-8 lg:pt-5">{page}</main>
+          <main className="pb-safe-bar-lg mx-auto w-full max-w-[1320px] flex-1 px-4 pt-4 sm:px-5 lg:px-8 lg:pt-5">{page}</main>
         </div>
       </div>
-      {t && role && (
-        <nav
-          aria-label="Organizer"
-          className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 backdrop-blur-md lg:hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-        >
-          {bottom.map((it) => (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              end={it.end}
-              className={({ isActive }) =>
-                cn(
-                  'relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold',
-                  isActive ? 'text-fg' : 'text-muted',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className={cn('absolute top-0 h-1 w-7 rounded-b-full', isActive ? 'bg-primary' : 'bg-transparent')} aria-hidden />
-                  <span className="relative">
-                    <Icon name={it.icon} size={22} strokeWidth={isActive ? 2 : 1.7} />
-                    {it.live && <span className="absolute -right-1 -top-0.5 h-2 w-2 animate-pulse-dot rounded-full bg-live" aria-hidden />}
-                  </span>
-                  {it.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-          <button
-            onClick={() => setDrawer(true)}
-            className="flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold text-muted"
-          >
-            <Icon name="more" size={22} />
-            More
-          </button>
-        </nav>
-      )}
+      <BottomBar
+        label="Organizer"
+        hideFrom="lg"
+        items={bottom.map(({ to, label, icon, end, live }) => ({ to, label, icon, end, badge: live }))}
+        more={{ open: more, active: !onBarPage, onOpen: () => setMore(true) }}
+      />
+      {moreSheet}
       <ScoreDialog matchId={scoreFor} onClose={() => setScoreFor(null)} />
       {t && role && palette && (
         <CommandPalette

@@ -26,7 +26,7 @@ export function ThemeToggle({ labels = false, className }: { labels?: boolean; c
             title={`${label} theme`}
             onClick={() => setTheme(value)}
             className={cn(
-              'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
+              'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors touch:min-h-11',
               on ? 'bg-surface text-fg shadow-lift' : 'text-muted hover:text-fg',
               labels && 'min-w-0 flex-1 px-2',
             )}

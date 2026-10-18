@@ -40,7 +40,7 @@ export function ReviewStep({ t, me, chosen, picked, total, onEditStep }: Props) 
         Check and pay
       </h2>
       <p className="mb-4 text-[14px] text-muted">Make sure everything looks right. Tap Edit to change a section.</p>
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <div className="panel divide-y divide-line">
           <div className="flex items-start gap-3 p-4 sm:px-5">
             <div className="min-w-0 flex-1">

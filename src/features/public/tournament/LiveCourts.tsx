@@ -27,7 +27,7 @@ export function LiveCourts() {
           ) : undefined
         }
       />
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
         {t.courts.map((c) => (
           <CourtCard key={c.id} lk={lk} court={c} now={now} match={matches.find((m) => m.status === 'on_court' && m.courtId === c.id)} />
         ))}

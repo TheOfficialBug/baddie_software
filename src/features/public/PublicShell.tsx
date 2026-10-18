@@ -13,7 +13,8 @@ import { useAccess } from '@/auth/useAccess';
 import { HelpButton } from '@/components/help/Help';
 import { NoticeBell } from '@/components/notices/Notices';
 import { BackButton } from '@/components/ui/BackButton';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { BottomBar } from '@/components/ui/BottomBar';
+import { type IconName } from '@/components/ui/Icon';
 import { Logo } from '@/components/ui/Logo';
 import { isHomePath } from '@/components/ui/parentPath';
 import { ThemeSwitchButton, ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -50,7 +51,7 @@ export function PublicShell() {
                 end={n.end}
                 className={({ isActive }) =>
                   cn(
-                    'flex min-h-11 items-center rounded-full px-4 text-[14px] font-semibold transition-colors',
+                    'flex min-h-11 items-center rounded-full px-3 text-[14px] font-semibold transition-colors lg:px-4',
                     isActive ? 'bg-surface text-fg shadow-lift' : 'text-muted hover:text-fg',
                   )
                 }
@@ -80,42 +81,6 @@ export function PublicShell() {
       <Footer />
       {!focused && <BottomBar items={nav} />}
     </div>
-  );
-}
-
-/** Phone bottom navigation (design: PublicMobile). Lime bar marks the active tab. */
-export function BottomBar({ items }: { items: { to: string; label: string; icon: IconName; end?: boolean; badge?: boolean }[] }) {
-  return (
-    <nav
-      aria-label="Sections"
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 backdrop-blur-md md:hidden"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
-      {items.map((it) => (
-        <NavLink
-          key={it.to}
-          to={it.to}
-          end={it.end}
-          className={({ isActive }) =>
-            cn(
-              'relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-semibold',
-              isActive ? 'text-fg' : 'text-muted',
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span className={cn('absolute top-0 h-1 w-7 rounded-b-full', isActive ? 'bg-primary' : 'bg-transparent')} aria-hidden />
-              <span className="relative">
-                <Icon name={it.icon} size={22} strokeWidth={isActive ? 2 : 1.7} />
-                {it.badge && <span className="absolute -right-1 -top-0.5 h-2 w-2 animate-pulse-dot rounded-full bg-live" aria-hidden />}
-              </span>
-              {it.label}
-            </>
-          )}
-        </NavLink>
-      ))}
-    </nav>
   );
 }
 

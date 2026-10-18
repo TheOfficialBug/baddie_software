@@ -129,7 +129,7 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
       }
     >
       <form
-        className="grid gap-4 sm:grid-cols-2"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -181,7 +181,7 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
         </Field>
         <fieldset className="flex flex-col gap-2 sm:col-span-2">
           <legend className="mb-1.5 text-[14px] font-semibold">Events</legend>
-          <div className="grid gap-1.5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {events.map((e) => (
               <label
                 key={e.key}
@@ -198,7 +198,7 @@ export function NewTournamentDialog({ open, orgId, onClose }: { open: boolean; o
               </label>
             ))}
           </div>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
             <Input
               aria-label="Custom event name"
               value={custom.name}

@@ -95,7 +95,7 @@ export function TVMode() {
           {t.courts.length === 0 ? (
             <p className="text-[18px] text-muted">No courts set up yet.</p>
           ) : (
-            <div className="grid content-start gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 3xl:gap-6">
+            <div className="grid grid-cols-1 content-start gap-4 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 3xl:gap-6">
               {t.courts.map((c) => (
                 <CourtCard
                   key={c.id}
@@ -124,7 +124,7 @@ export function TVMode() {
           {upNext.length === 0 ? (
             <p className="panel p-5 text-[16px] text-muted">No matches waiting to be called.</p>
           ) : (
-            <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 3xl:gap-4">
+            <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 3xl:gap-4">
               {upNext.map((q, i) => {
                 const ctx = matchContext(lk, q.match);
                 return (

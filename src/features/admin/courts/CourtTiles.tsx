@@ -94,7 +94,7 @@ export function BusyCourt({ lk, court, m, now }: { lk: Lookup; court: Court; m: 
   const decided = Math.max(wa, wb) >= Math.ceil(rules.bestOf / 2);
 
   const sideActions = (side: Side) => (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 touch:gap-2">
       <IconButton
         size="sm"
         label={`Point to ${lk.entryName(m[side])}`}
