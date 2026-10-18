@@ -86,7 +86,9 @@ export function applyRows<T extends Pick<DB, SyncedColl>>(db: T, rows: Row[]): T
   const byColl = new Map<SyncedColl, Row[]>();
   for (const r of rows) {
     if (!(r.coll in SYNCED)) continue;
-    byColl.set(r.coll, [...(byColl.get(r.coll) ?? []), r]);
+    const list = byColl.get(r.coll);
+    if (list) list.push(r);
+    else byColl.set(r.coll, [r]);
   }
   if (!byColl.size) return db;
   const next = { ...db };
@@ -142,6 +144,7 @@ const CLIENT_ID = Math.random().toString(36).slice(2, 12) + Date.now().toString(
 const PAGE = 1000;
 const POLL_MS = 15_000;
 const SAFETY_POLL_MS = 60_000;
+const INBOX_MS = 40;
 
 let client: SupabaseClient | null = null;
 let channel: RealtimeChannel | null = null;
@@ -156,6 +159,9 @@ let retryTimer: ReturnType<typeof setTimeout> | undefined;
 let retryDelay = 2000;
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 let loadSeq = 0;
+/** Realtime rows waiting to be applied together (see receive). */
+let inbox: Row[] = [];
+let inboxTimer: ReturnType<typeof setTimeout> | undefined;
 /** Changes the database refused (counted so a caller can tell whether its own change went through). */
 let refusals = 0;
 
@@ -175,20 +181,22 @@ function applyToStore(patch: Partial<DB>) {
 }
 
 async function fetchAll(sb: SupabaseClient): Promise<{ rows: DbRow[]; max: number }> {
+  // Retired records (redraws and resets leave many) are skipped by the query instead of downloaded. The newest
+  // version, retired ones included, is read first: whatever changes while the pages load is newer and gets caught up.
+  const newest = await sb.from('app_entities').select('version').order('version', { ascending: false }).limit(1);
+  if (newest.error) throw newest.error;
+  const max = Number((newest.data as { version: number }[])[0]?.version ?? 0);
   const rows: DbRow[] = [];
-  let max = 0;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await sb
       .from('app_entities')
       .select('coll,id,data,deleted,version,client_id')
+      .eq('deleted', false)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
-    for (const r of data as DbRow[]) {
-      max = Math.max(max, Number(r.version));
-      if (!r.deleted) rows.push(r);
-    }
+    rows.push(...(data as DbRow[]));
     if (data.length < PAGE) break;
   }
   return { rows, max };
@@ -252,6 +260,10 @@ export async function reload(): Promise<void> {
     // keep changes that are still on their way to the database
     let next = applyRows(empty, rows);
     next = applyRows(next, [...queue.values()]);
+    // realtime rows still waiting would be replaced by the snapshot anyway
+    clearTimeout(inboxTimer);
+    inboxTimer = undefined;
+    inbox = [];
     applyToStore(next);
     await Promise.all([fetchPrivate(sb, 0), fetchTeam(sb)]);
     useRemote.setState({ status: 'ready', error: undefined });
@@ -281,19 +293,30 @@ async function catchUp() {
   }
 }
 
-/** Rows from the database (realtime or catch-up). */
-function receive(rows: DbRow[]) {
-  const fresh: Row[] = [];
+/**
+ * Rows from the database (realtime or catch-up). Realtime sends one message per row, and one action at the
+ * desk writes several (a result, the matches it decides, the undo record, a notice): rows arriving within
+ * INBOX_MS are applied together, so every open page renders once per action instead of once per row.
+ */
+function receive(rows: DbRow[], batched = false) {
   for (const r of rows) {
     const v = Number(r.version);
     if (v > maxVersion) maxVersion = v;
     // our own echo, or something we changed again since: the local copy is newer
     if (r.client_id === CLIENT_ID || queue.has(`${r.coll}:${r.id}`)) continue;
-    fresh.push(r);
+    inbox.push(r);
   }
+  if (!batched) applyInbox();
+  else if (inbox.length && inboxTimer === undefined) inboxTimer = setTimeout(applyInbox, INBOX_MS);
+}
+
+function applyInbox() {
+  clearTimeout(inboxTimer);
+  inboxTimer = undefined;
+  const fresh = inbox;
+  inbox = [];
   if (!fresh.length) return;
-  const next = applyRows(syncedPart(useStore.getState()), fresh);
-  applyToStore(next);
+  applyToStore(applyRows(syncedPart(useStore.getState()), fresh));
 }
 
 function subscribe() {
@@ -302,7 +325,7 @@ function subscribe() {
   channel = client
     .channel(`app-${CLIENT_ID}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_entities' }, (payload) => {
-      if (payload.new && 'coll' in payload.new) receive([payload.new as DbRow]);
+      if (payload.new && 'coll' in payload.new) receive([payload.new as DbRow], true);
     })
     .subscribe((status) => {
       const live = status === 'SUBSCRIBED';
@@ -331,6 +354,8 @@ function schedulePolling() {
 // ---------------------------------------------------------------------------
 function enqueue(changes: Change[]) {
   for (const c of changes) queue.set(`${c.coll}:${c.id}`, c);
+  // a local edit is newer than any row still waiting in the inbox
+  if (inbox.length) inbox = inbox.filter((r) => !queue.has(`${r.coll}:${r.id}`));
   setPending();
   void flush();
 }
