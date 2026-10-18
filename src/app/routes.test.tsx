@@ -94,7 +94,7 @@ describe('routes', () => {
   it('shows the not-found page for unknown URLs', async () => {
     await renderAt('/no-such-page');
     expect(screen.getByRole('heading', { name: /couldn.t find that page/i })).toBeInTheDocument();
-  }, 120_000); // renders every page in turn: slow when the whole suite runs in parallel
+  });
 
   it('redirects old /live links to the courts tab', async () => {
     const live = useStore.getState().tournaments.find((t) => t.status === 'live')!;
