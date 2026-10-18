@@ -194,7 +194,13 @@ export function CourtBoard({ lk, t }: { lk: Lookup; t: Tournament }) {
             </div>
             <p className="mt-1 text-[13px] text-muted">
               <span className="num">{t.courts.length - free.length}</span>/<span className="num">{t.courts.length}</span> courts in use ·{' '}
-              <span className="num">{queue.length}</span> ready to call
+              <span className="num">{callable.length}</span> ready to call
+              {queue.length > callable.length && (
+                <>
+                  {' '}
+                  (<span className="num">{queue.length - callable.length}</span> resting or busy)
+                </>
+              )}
               {left > 0 && done > 0 && (
                 <>
                   {' '}
