@@ -158,10 +158,10 @@ export const useStore = create<State>()(
       /** The current database snapshot (no viewer state, no actions). */
       const db = (): DB => selectDB(get());
       const commit = (next: DB) => set({ ...next });
-      /** Undo record for a match, taken before it changes. */
-      const record = (matchId: ID, label: string): MatchUpdate => {
-        const m = get().matches.find((x) => x.id === matchId)!;
-        return { id: ops.uid('u'), matchId, at: Date.now(), label, before: ops.snapshot(m) };
+      /** Undo record for a match, taken before it changes (none if the match is gone, e.g. removed on another device). */
+      const record = (matchId: ID, label: string): MatchUpdate[] => {
+        const m = get().matches.find((x) => x.id === matchId);
+        return m ? [{ id: ops.uid('u'), matchId, at: Date.now(), label, before: ops.snapshot(m) }] : [];
       };
 
       return {
@@ -363,21 +363,23 @@ export const useStore = create<State>()(
             return { busy: [], resting: [] };
           }
           const notice = ops.courtCallNotice(r.db, matchId, courtId, now);
-          commit({ ...r.db, updates: [...r.db.updates, u], notices: notice ? [...r.db.notices, notice] : r.db.notices });
+          commit({ ...r.db, updates: [...r.db.updates, ...u], notices: notice ? [...r.db.notices, notice] : r.db.notices });
           return null;
         },
         fillCourts: (tid) => {
           const before = db();
           const r = fillFreeCourts(before, tid, Date.now());
           if (!r.called.length) return 0;
-          const ups = r.called.map(({ matchId }) => record(matchId, 'Called to court'));
+          const ups = r.called.flatMap(({ matchId }) => record(matchId, 'Called to court'));
           commit({ ...r.db, updates: [...r.db.updates, ...ups] });
           return r.called.length;
         },
         returnToQueue: (matchId) => {
           const u = record(matchId, 'Returned to queue');
-          const next = ops.returnToQueue(db(), matchId);
-          commit({ ...next, updates: [...next.updates, u] });
+          const before = db();
+          const next = ops.returnToQueue(before, matchId);
+          if (next === before) return;
+          commit({ ...next, updates: [...next.updates, ...u] });
         },
         adjustLive: (matchId, side, delta) => {
           const current = db();
@@ -397,10 +399,15 @@ export const useStore = create<State>()(
           return null;
         },
         setLiveScore: (matchId, games, live) => {
+          // only while on court: a live score must never replace a result saved meanwhile (e.g. on another device)
+          if (get().matches.find((m) => m.id === matchId)?.status !== 'on_court') {
+            toast('Not saved: this match is no longer on court', { tone: 'error' });
+            return;
+          }
           const u = record(matchId, 'Live score updated');
           set((s) => ({
             matches: s.matches.map((m) => (m.id === matchId ? { ...m, games, live, startedAt: m.startedAt ?? Date.now() } : m)),
-            updates: [...s.updates, u],
+            updates: [...s.updates, ...u],
           }));
         },
         saveResult: (matchId, input) => {
@@ -408,14 +415,14 @@ export const useStore = create<State>()(
           const u = record(matchId, prev?.status === 'finished' ? 'Result edited' : 'Result saved');
           const r = ops.saveResult(db(), matchId, input, Date.now());
           if (!r.db) return r.error ?? 'Could not save.';
-          commit({ ...r.db, updates: [...r.db.updates, u] });
+          commit({ ...r.db, updates: [...r.db.updates, ...u] });
           return null;
         },
         resetMatch: (matchId) => {
           const u = record(matchId, 'Score reset');
           const r = resets.resetMatch(db(), matchId);
           if (!r.db) return r.error;
-          commit({ ...r.db, updates: [...r.db.updates, u] });
+          commit({ ...r.db, updates: [...r.db.updates, ...u] });
           return null;
         },
         resetEventResults: (eventId) => commit(resets.resetEventResults(db(), eventId)),

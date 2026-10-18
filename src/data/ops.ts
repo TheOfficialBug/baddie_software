@@ -189,7 +189,8 @@ export function callToCourt(
   const busy = db.matches.find((x) => x.status === 'on_court' && x.courtId === courtId && x.id !== matchId);
   if (busy) return { error: `That court has match #${busy.number} on it.` };
   if (m.status === 'ready') {
-    const t = tournamentOfEvent(db, m.eventId)!;
+    const t = tournamentOfEvent(db, m.eventId);
+    if (!t) return { error: 'Match not found.' };
     const eventIds = new Set(db.events.filter((e) => e.tournamentId === t.id).map((e) => e.id));
     const check = checkCall(
       m,
@@ -212,6 +213,8 @@ export function callToCourt(
 }
 
 export function returnToQueue(db: DB, matchId: ID): DB {
+  // only from a court: a stale tap (the result came in from another device) changes nothing
+  if (db.matches.find((m) => m.id === matchId)?.status !== 'on_court') return db;
   return patchMatch(db, matchId, { status: 'ready', courtId: undefined, calledAt: undefined, startedAt: undefined, live: null, games: [] });
 }
 
@@ -275,14 +278,14 @@ export function saveResult(db: DB, matchId: ID, input: ResultInput, now: number)
   if (!check.ok) return { error: check.errors[0] ?? 'Check the scores.' };
   if (m.status === 'finished') {
     const blocking = blockingDependents(matchId, db.matches).filter((d) => d.a !== null);
-    const sameWinner = m.winner === check.winner;
-    if (!sameWinner && blocking.length) {
+    if (changesOutcome(m, { winner: check.winner, games: input.games, result: input.result }) && blocking.length) {
       return {
         error: `Can't change the winner: match${blocking.length > 1 ? 'es' : ''} ${blocking.map((b) => `#${b.number}`).join(', ')} already started using this result.`,
       };
     }
   }
-  const t = tournamentOfEvent(db, m.eventId)!;
+  const t = tournamentOfEvent(db, m.eventId);
+  if (!t) return { error: 'Match not found.' };
   const next = patchMatch(db, matchId, {
     status: 'finished',
     games: input.games,
@@ -296,15 +299,40 @@ export function saveResult(db: DB, matchId: ID, input: ResultInput, now: number)
   return { db: resolveTournament(next, t.id) };
 }
 
+/**
+ * Whether a finished match's new result changes who goes on: the winner, or (in a group, where games
+ * and points decide the table) the scores.
+ */
+function changesOutcome(m: Match, next: { status?: Match['status']; winner?: Side; games: GameScore[]; result?: ResultType }): boolean {
+  if ((next.status ?? 'finished') !== 'finished' || next.winner !== m.winner) return true;
+  return !!m.groupId && (next.result !== m.result || JSON.stringify(next.games) !== JSON.stringify(m.games));
+}
+
 /** Restore a match to an earlier snapshot (undo). Refuses if later matches already depend on it. */
 export function restore(db: DB, u: MatchUpdate): OpResult {
   const m = db.matches.find((x) => x.id === u.matchId);
   if (!m) return { error: 'Match not found.' };
-  if (m.status === 'finished' && u.before.status !== 'finished') {
+  if (m.status === 'finished' && changesOutcome(m, u.before)) {
     const blocking = blockingDependents(m.id, db.matches);
     if (blocking.length) return { error: `Can't undo: match #${blocking[0].number} has already started.` };
   }
-  const t = tournamentOfEvent(db, m.eventId)!;
+  const t = tournamentOfEvent(db, m.eventId);
+  if (!t) return { error: 'Match not found.' };
+  if (u.before.status === 'on_court' && m.status !== 'on_court') {
+    // back on its court: only if that court is still there and free, and its players aren't on another one
+    const court = t.courts.find((c) => c.id === u.before.courtId);
+    const there = db.matches.find((x) => x.id !== m.id && x.status === 'on_court' && x.courtId === u.before.courtId);
+    if (!court) return { error: "Can't undo: its court is no longer in use." };
+    if (there) return { error: `Can't undo: ${court.name} has match #${there.number} on it now.` };
+    const players = new Set([m.a, m.b].flatMap((e) => db.entries.find((x) => x.id === e)?.playerIds ?? []));
+    const busy = db.matches.find(
+      (x) =>
+        x.id !== m.id &&
+        x.status === 'on_court' &&
+        [x.a, x.b].some((e) => db.entries.find((y) => y.id === e)?.playerIds.some((p) => players.has(p))),
+    );
+    if (busy) return { error: `Can't undo: a player is on court in match #${busy.number}.` };
+  }
   return { db: resolveTournament(patchMatch(db, m.id, { ...u.before }), t.id) };
 }
 
