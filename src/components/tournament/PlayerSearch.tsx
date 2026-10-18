@@ -1,26 +1,24 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
-import type { Tournament } from '@/engine/types';
+import type { Player, Tournament } from '@/engine/types';
 
 import { cn } from '@/lib/cn';
-
-import type { Lookup } from '@/data/lookup';
-import { tournamentPlayers } from '@/data/queries';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Icon } from '@/components/ui/Icon';
 
 /** "Find a player" with a results dropdown. Works on light pages and on the ink hero band. */
 export function PlayerSearch({
-  lk,
+  players: all,
   t,
   autoFocus,
   limit = 8,
   placeholder,
   className,
 }: {
-  lk: Lookup;
+  /** Everyone entered (see tournamentPlayers). */
+  players: Player[];
   t: Tournament;
   autoFocus?: boolean;
   limit?: number;
@@ -32,7 +30,6 @@ export function PlayerSearch({
   const listId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const nav = useNavigate();
-  const all = useMemo(() => tournamentPlayers(lk, t), [lk, t]);
   const hits = q.trim() ? all.filter((p) => `${p.name} ${p.club}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, limit) : [];
   useEffect(() => {
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setQ('');
