@@ -58,7 +58,7 @@ export function BracketMatch({
     <Comp
       type={Comp === 'button' ? 'button' : undefined}
       onClick={Comp === 'button' ? () => onOpen!(m) : undefined}
-      title={`${m.number > 0 ? `#${m.number} · ` : ''}${foot}`}
+      title={`${m.number > 0 && !isBye ? `#${m.number} · ` : ''}${foot}`}
       aria-label={Comp === 'button' ? `Match ${m.number}: ${sideName(lk, m, 'a')} vs ${sideName(lk, m, 'b')}, ${foot}` : undefined}
       className={cn(
         'relative flex w-full overflow-hidden rounded-md border bg-surface text-left transition-[opacity,border-color]',
@@ -79,7 +79,7 @@ export function BracketMatch({
         )}
         aria-hidden
       >
-        {m.number > 0 ? m.number : ''}
+        {m.number > 0 && !isBye ? m.number : ''}
         {m.status === 'on_court' && <span className="text-[9.5px] font-bold">{court.replace(/^court\s*/i, 'C').slice(0, 4)}</span>}
       </span>
       <span className="relative min-w-0 flex-1">

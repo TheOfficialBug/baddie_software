@@ -123,7 +123,7 @@ export function resolveMatches(matches: Match[], ctx: ResolveContext): Match[] {
       } else if (a !== null && b !== null && (a === 'BYE' || b === 'BYE')) {
         m.status = 'bye';
         m.winner = a !== 'BYE' ? 'a' : b !== 'BYE' ? 'b' : undefined;
-        m.number = 0;
+        // keeps its number: a bye that depends on a result can turn back into a real match (a corrected result)
       } else if (a !== null && b !== null) {
         m.status = 'ready';
         m.winner = undefined;
